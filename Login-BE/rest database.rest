@@ -1,0 +1,12 @@
+###
+
+POST https://rest.hiliger.com:2500/createDb
+
+###
+
+DELETE https://rest.hiliger.com:2500/deleteDb
+
+###
+
+POST https://rest.hiliger.com:2500/initDb
+

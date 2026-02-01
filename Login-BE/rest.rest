@@ -1,0 +1,171 @@
+### TEST
+
+POST https://192.168.4.200:3500/createDb
+
+###
+
+DELETE https://192.168.4.200:3500/deleteDb
+
+###
+
+POST https://192.168.4.200:3500/initDb
+
+###
+
+POST https://rest.hiliger.com:3000/auth
+content-type: application/json
+
+{   
+    "email": "mkhiliger@gmail.com", 
+    "password": "mkh123" 
+}
+
+###
+
+POST https://192.168.4.200:3500/auth
+content-type: application/json
+
+{   
+    "user": "asdf", 
+    "password": "asdf" 
+}
+###
+
+POST https://192.168.4.200:3500/auth
+content-type: application/json
+
+{   
+    "user": "mkhiliger@gmail.com", 
+    "password": "" 
+}
+###
+
+GET https://192.168.4.200:3500/userroles
+
+###
+
+GET https://192.168.4.200:3500/users
+
+###
+
+GET https://192.168.4.200:3500/userperms/1
+
+###
+
+PUT https://192.168.4.200:3500/user/1
+content-type: application/json
+
+{   
+    "email": "mkhiliger@gmail.com", 
+    "first": "Mike",
+    "status": "Inactive" 
+}
+
+###
+
+POST https://192.168.4.200:3500/user
+content-type: application/json
+
+{   
+    "email": "dkhiliger@gmail.com", 
+    "first": "Mike",
+    "last": "Hiliger", 
+    "password": "12345"
+    }
+
+###
+
+DELETE https://192.168.4.200:3500/user/1
+content-type: application/json
+
+
+###
+
+DELETE https://192.168.4.200:3500/userrole
+content-type: application/json
+
+{   
+    "userid": 2, 
+    "roleid": 2
+    }
+
+###
+
+POST https://192.168.4.200:3500/userrole
+content-type: application/json
+
+{   
+    "userid": 3, 
+    "roleid": 2
+    }
+###
+
+GET https://192.168.4.200:3500/roles
+
+
+###
+
+POST https://192.168.4.200:3500/role
+content-type: application/json
+
+{   
+    "role": "myrole2", 
+    "role_desc": "Role Number 2"
+    }
+
+###
+
+DELETE https://192.168.4.200:3500/role/2
+content-type: application/json
+
+###
+
+GET https://192.168.4.200:3500/perms
+
+
+###
+
+POST https://192.168.4.200:3500/perm
+content-type: application/json
+
+{   
+    "perm_desc": "Perm Number 1"
+    }
+
+###
+
+DELETE https://192.168.4.200:3500/perm/11
+content-type: application/json
+
+###
+
+POST https://192.168.4.200:3500/test
+content-type: application/json
+
+[ {  
+    "role": "myrole11", 
+    "role_desc": "Role Number 11"
+    }
+    # ,
+    # {   
+    # "role": "myrole9", 
+    # "role_desc": "Role Number 9"
+    # },
+    # {   
+    # "role": "myrole6", 
+    # "role_desc": "Role Number 6"
+    # }
+     ] 
+
+###
+GET https://api.godaddy.com/v1/domains/hiliger.com/records/A/@"
+Authorization: sso-key e42kRGAFopd1_SgFRBgZ2ukL55wuESBqvyZ:HtmPBvZzEXQgcgxbpx2xQJ
+Content-Type: application/json
+
+
+###
+PUT https://api.godaddy.com/v1/domains/hiliger.com/records/A/@"
+Authorization: sso-key e42kRGAFopd1_SgFRBgZ2ukL55wuESBqvyZ:HtmPBvZzEXQgcgxbpx2xQJ
+Content-Type: application/json
+
+{ "data" : "8.8.8.8" }

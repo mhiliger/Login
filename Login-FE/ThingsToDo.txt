@@ -1,0 +1,8 @@
+Pending
+remove useClickAway or fix the issue with clicking on select list closing modal
+set focus on login to the submit button so enter will submit the form
+add option to see password in plain text
+remove stay checkbox or enable it somehow 
+
+Done
+add useId to the login payload so we can allow changes to email -DONE

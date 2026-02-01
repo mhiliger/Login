@@ -1,0 +1,7 @@
+{
+  "name": "Login",
+  "workspaces": [
+    "Login-FE",
+    "Login-BE"
+  ]
+}

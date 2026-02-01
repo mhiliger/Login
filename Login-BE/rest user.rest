@@ -1,0 +1,118 @@
+###
+
+POST https://192.168.4.200:3500/auth
+content-type: application/json
+###
+
+GET https://192.168.4.200:3500/refresh
+content-type: application/json
+
+###
+
+
+POST https://192.168.4.200:3500/auth
+
+{   
+    "email": "mkhiliger@gmail.com", 
+    "password": "mkh123" 
+}
+
+###
+
+POST https://192.168.4.200:3500/auth
+content-type: application/json
+
+{   
+    "email": "asdf", 
+    "password": "asdf" 
+}
+###
+
+POST https://192.168.4.200:3500/auth
+content-type: application/json
+
+{   
+    "email": "mkhiliger@gmail.com", 
+    "password": "" 
+}
+###
+
+GET https://192.168.4.200:3500/userroles/2
+
+###
+
+GET https://192.168.4.200:3500/users
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6Im1raGlsaWdlckBnbWFpbC5jb20iLCJmaXJzdCI6Ik1pa2UiLCJsYXN0IjoiSGlsaWdlciIsInN0YXR1cyI6IlBlbmRpbmciLCJwZXJtaXNzaW9ucyI6WzEsMiwzLDQsNSwxMCw5LDYsNyw4XSwiaWF0IjoxNjUxMjcwMDE1LCJleHAiOjE2NTEyNzAwNDV9.usaPUeYmQsEVCPtHiMtiMtcS93mpstI9shpmsPU5fFI
+
+###
+
+GET https://192.168.4.200:3500/userperms/1
+
+###
+
+PUT https://192.168.4.200:3500/user/1
+content-type: application/json
+
+{   
+    "email": "mkhiliger@gmail.com", 
+    "first": "Mike",
+    "status": "Inactive" 
+}
+
+
+###
+
+PUT https://192.168.4.200:3500/user/1
+content-type: application/json
+
+{   
+    "email": "abchiliger@gmail.com", 
+    "first": "Mike",
+    "status": "Inactive" 
+}
+
+
+###
+
+POST https://192.168.4.200:3500/user
+content-type: application/json
+
+{   
+    "email": "dkhiliger@gmail.com", 
+    "first": "Mike",
+    "last": "Hiliger", 
+    "password": "12345"
+    }
+
+###
+
+DELETE https://192.168.4.200:3500/user/1
+content-type: application/json
+
+
+###
+
+DELETE https://192.168.4.200:3500/userrole
+content-type: application/json
+
+{   
+    "userid": 2, 
+    "roleid": 2
+    }
+
+###
+
+POST https://192.168.4.200:3500/userrole
+content-type: application/json
+
+{ [ { "userid": 2, "roleid": 1}, { "userid": 2, "roleid": 4} ] }
+
+###
+
+GET https://rest.hiliger.com:2500/usersbyperm/12
+content-type: application/json
+
+###
+
+GET https://rest.hiliger.com:2500/usersbyrole/5
+content-type: application/json

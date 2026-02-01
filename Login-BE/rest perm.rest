@@ -1,0 +1,28 @@
+###
+
+GET https://192.168.4.200:3500/perms
+
+
+###
+
+GET https://192.168.4.200:3500/roleperms/3
+
+
+###
+
+POST https://192.168.4.200:3500/perm
+content-type: application/json
+
+{   
+    "perm_desc": "Perm Number 1"
+    }
+
+###
+
+DELETE https://192.168.4.200:3500/perm/11
+content-type: application/json
+
+###
+
+DELETE https://192.168.4.200:3500/roleperm/3
+content-type: application/json

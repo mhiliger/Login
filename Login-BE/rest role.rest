@@ -1,0 +1,40 @@
+###
+
+GET https://192.168.4.200:3500/roles
+
+###
+
+POST https://192.168.4.200:3500/role
+content-type: application/json
+
+[ {  
+    "role": "myrole11", 
+    "role_desc": "Role Number 11"
+    }
+    # ,
+    # {   
+    # "role": "myrole9", 
+    # "role_desc": "Role Number 9"
+    # },
+    # {   
+    # "role": "myrole6", 
+    # "role_desc": "Role Number 6"
+    # }
+     ] 
+###
+
+DELETE https://192.168.4.200:3500/role/6
+content-type: application/json
+
+###
+PUT https://192.168.4.200:3500/role/4
+content-type: application/json
+
+{   
+    "role": "AccessAdmin", 
+    "role_desc": "Role Number 2"
+    }
+
+###
+
+GET https://rest.hiliger.com:2500/rolesbyperm/9
