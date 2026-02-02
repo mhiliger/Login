@@ -54,3 +54,5 @@ lerna-debug.log*
 .vercel
 .netlify
 .turbo
+.gemini/
+gha-creds-*.json
