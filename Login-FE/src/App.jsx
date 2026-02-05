@@ -20,7 +20,12 @@ function App() {
   });
 
   return (
-    <AuthProvider>
+    <AuthProvider initialConfig={{
+      passwordPolicy: {
+        regex: /^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%]).{8,24}$/,
+        message: "8 - 24 characters, must include uppercase and lowercase letters, a number and a special character"
+      }
+    }}>
       <ThemeProvider theme={loginTheme}>
         <QueryClientProvider client={queryClient}>
           <AppRoutes />

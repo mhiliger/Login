@@ -1,23 +1,18 @@
-import { Typography, Box, Stack } from "@mui/material";
 import React from "react";
+import { Unauthorized as LibUnauthorized } from "@your-org/auth-fe";
+import { Typography, Stack, Box } from "@mui/material";
 
-function Unauthorized() {
+/**
+ * App-specific wrapper for the library's boilerplate Unauthorized component.
+ */
+function Unauthorized(props) {
   return (
-    <Stack
-      sx={{
-        margin: "10vh",
-        alignItems: "center",
-      }}
-    >
-      <Typography variant="h4">
-        Your are not authorized to access this page.
-      </Typography>
-      <br />
-      <br />
-      <Typography variant="h5">
-        Contact your system administrator for access rights.
-      </Typography>
-    </Stack>
+    <LibUnauthorized
+      {...props}
+      Typography={Typography}
+      Stack={Stack}
+      Box={Box}
+    />
   );
 }
 
