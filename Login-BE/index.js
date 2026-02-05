@@ -50,7 +50,8 @@ async function initializeApp() {
 
 function startServer() {
   const app = express();
-  const verifyJWT = require("./middleware/verifyJWT");
+  const { createAuthRouter, createVerifyJWT } = require("@your-org/auth-be");
+  const authAdapter = require("./authAdapter");
 
   app.use(cors({
     origin: ["https://rest.hiliger.com:3000", "https://localhost:5173", "https://localhost:5174", "https://127.0.0.1:5173"],
@@ -61,25 +62,38 @@ function startServer() {
   app.use(bodyParser.json());
   app.use(cookieParser());
 
-  // MAIN ENTRY POINT User Interface Routes
+  // Configure Authentication Library
+  const authConfig = {
+    accessTokenSecret: process.env.ACCESS_TOKEN_SECRET,
+    refreshTokenSecret: process.env.REFRESH_TOKEN_SECRET,
+    accessTokenLife: "15m",
+    refreshTokenLife: "1d",
+    loginPath: "/auth",
+  };
 
-  app.use("/", require("./routes/auth.js"));
+  // Mount Auth Routes (login, refresh, logout)
+  app.use("/", createAuthRouter({ 
+    db: authAdapter, 
+    config: authConfig 
+  }));
 
-  app.use("/", require("./routes/logout.js"));
-
-  app.use("/", require("./routes/refreshtoken.js"));
-
-
+  // Configure JWT Verification Middleware
+  const verifyJWT = createVerifyJWT({
+    accessTokenSecret: authConfig.accessTokenSecret,
+    onVerifySuccess: (req, decoded) => {
+      // Mapping decoded token to existing app's req properties for backward compatibility
+      req.email = decoded.email;
+      req.first = decoded.first;
+      req.userstatus = decoded.status;
+      req.permissions = decoded.permissions;
+      req.userId = decoded.userId;
+    }
+  });
 
   // Test Routes to initialize db
-
   app.use("/", require("./routes/deletedb.js"));
-
   app.use("/", require("./routes/createdb.js"));
-
   app.use("/", require("./routes/initdb.js"));
-
-
 
   app.use(verifyJWT);
 

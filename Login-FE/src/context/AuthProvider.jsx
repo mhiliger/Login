@@ -1,16 +1,9 @@
-import { createContext, useState } from "react";
+import { AuthProvider as LibAuthProvider } from "@your-org/auth-fe";
 
-const AuthContext = createContext({});
+/**
+ * App-specific wrapper for AuthProvider.
+ * In this project, it's a direct re-export from the library.
+ */
+export const AuthProvider = LibAuthProvider;
 
-export const AuthProvider = ({ children }) => {
-  const [auth, setAuth] = useState({});
-  const [user, setUser] = useState(undefined);
-
-  return (
-    <AuthContext.Provider value={{ auth, setAuth, user, setUser }}>
-      {children}
-    </AuthContext.Provider>
-  );
-};
-
-export default AuthContext;
+export default LibAuthProvider;

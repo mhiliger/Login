@@ -11,6 +11,7 @@
   "license": "ISC",
   "dependencies": {
     "@google-cloud/secret-manager": "^6.1.1",
+    "@your-org/auth-be": "file:../packages/auth-be",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "debug": "^4.3.7",

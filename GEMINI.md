@@ -60,6 +60,21 @@ The frontend is a React single-page application that uses React Router v6 for ro
 - **Components**: The UI is built with Material-UI components. Reusable components like `TableTemplate.jsx` are used for displaying data. Forms are built using React Hook Form and Yup for validation.
 - **API Layer**: `api/axios.js` configures an Axios instance for making HTTP requests to the backend.
 
+### Shared Authentication Libraries
+
+The authentication logic has been encapsulated into reusable packages in the `packages/` directory, managed via NPM Workspaces.
+
+#### Backend Library (`@your-org/auth-be`)
+- **Location**: `packages/auth-be`
+- **Purpose**: Provides factories for Express auth routes and JWT verification middleware.
+- **Integration**: Uses `Login-BE/authAdapter.js` to map library requirements to the project's PostgreSQL database.
+- **Key Exports**: `createAuthRouter` (for `/auth`, `/refresh`, `/logout`) and `createVerifyJWT`.
+
+#### Frontend Library (`@your-org/auth-fe`)
+- **Location**: `packages/auth-fe`
+- **Purpose**: Manages React auth state, secure API communication, and route guarding.
+- **Key Exports**: `AuthProvider`, `useAuth`, `useSecureAxios` (auto-refresh interceptor), and `RequireAuth`.
+
 ### Permission System
 
 The application has a three-tier access control system: Users -> Roles -> Permissions.

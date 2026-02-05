@@ -1,0 +1,15 @@
+{
+  "name": "@your-org/auth-be",
+  "version": "1.0.0",
+  "description": "Shared authentication and JWT management for Express.js",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "jsonwebtoken": "^9.0.0"
+  },
+  "peerDependencies": {
+    "express": "^4.0.0"
+  }
+}

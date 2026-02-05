@@ -1,8 +1,10 @@
-import { useContext } from "react";
-import AuthContext from "../context/AuthProvider";
+import { useAuth as useLibAuth } from "@your-org/auth-fe";
 
+/**
+ * App-specific wrapper for useAuth hook.
+ */
 const useAuth = () => {
-  return useContext(AuthContext);
+  return useLibAuth();
 };
 
 export default useAuth;
