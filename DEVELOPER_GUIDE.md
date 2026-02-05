@@ -9,35 +9,15 @@ This guide explains how to use the `@your-org/auth-be` and `@your-org/auth-fe` l
 npm install @your-org/auth-be
 ```
 
-### 2. Implement the Database Adapter
-The library requires a "Database Adapter" to handle storage operations. Create a file (e.g., `authAdapter.js`):
+### 2. Initialize and Mount
+The library provides a pre-built `PostgresAdapter` that works with the shared authentication database. You simply need to pass your application's database connection to it.
 
 ```javascript
-const authAdapter = {
-  validateUser: async (email, password) => {
-    // Logic to verify email/password in your DB
-    // Return user object { id, email, first, last, status }
-  },
-  getUserPermissions: async (email) => {
-    // Return an array of permission IDs [1, 2, 3]
-  },
-  saveRefreshToken: async (userId, token) => {
-    // Store the refresh token in the user's DB record
-  },
-  findUserByRefreshToken: async (token) => {
-    // Find and return user associated with this token
-  },
-  clearRefreshToken: async (userId) => {
-    // Clear the token from the user's DB record
-  }
-};
-```
+const { createAuthRouter, createVerifyJWT, createPostgresAdapter } = require('@your-org/auth-be');
+const db = require('./db'); // Your pg-promise database instance
 
-### 3. Mount Routes and Middleware
-In your `index.js` or `app.js`:
-
-```javascript
-const { createAuthRouter, createVerifyJWT } = require('@your-org/auth-be');
+// Initialize the shared adapter with your DB connection
+const authAdapter = createPostgresAdapter(db);
 
 const config = {
   accessTokenSecret: process.env.ACCESS_TOKEN_SECRET,
@@ -54,7 +34,8 @@ app.use('/', createAuthRouter({ db: authAdapter, config }));
 const verifyJWT = createVerifyJWT({ 
   accessTokenSecret: config.accessTokenSecret,
   onVerifySuccess: (req, decoded) => {
-    req.user = decoded; // Custom mapping if needed
+    // Map decoded token data to request object
+    req.user = decoded; 
   }
 });
 
@@ -71,15 +52,15 @@ npm install @your-org/auth-fe
 ```
 
 ### 2. Configure AuthProvider
-Wrap your app and provide a custom password policy:
+Wrap your app and provide a custom password policy (Regex and Message):
 
 ```javascript
 import { AuthProvider } from '@your-org/auth-fe';
 
 const myConfig = {
   passwordPolicy: {
-    regex: /^(?=.*[A-Z]).{8,}$/, // At least one uppercase, min 8 chars
-    message: "Password must be 8+ characters with one uppercase letter."
+    regex: /^(?=.*[A-Z]).{8,}$/, // Your custom application policy
+    message: "Password must be 8+ characters with at least one uppercase letter."
   }
 };
 

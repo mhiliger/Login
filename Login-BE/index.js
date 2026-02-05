@@ -50,8 +50,9 @@ async function initializeApp() {
 
 function startServer() {
   const app = express();
-  const { createAuthRouter, createVerifyJWT } = require("@your-org/auth-be");
-  const authAdapter = require("./authAdapter");
+  const { createAuthRouter, createVerifyJWT, createPostgresAdapter } = require("@your-org/auth-be");
+  const db = require("./db/index.js");
+  const authAdapter = createPostgresAdapter(db);
 
   app.use(cors({
     origin: ["https://rest.hiliger.com:3000", "https://localhost:5173", "https://localhost:5174", "https://127.0.0.1:5173"],
