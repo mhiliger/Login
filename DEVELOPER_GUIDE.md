@@ -52,19 +52,12 @@ npm install @your-org/auth-fe
 ```
 
 ### 2. Configure AuthProvider
-Wrap your app and provide a custom password policy (Regex and Message):
+Wrap your app with the AuthProvider:
 
 ```javascript
 import { AuthProvider } from '@your-org/auth-fe';
 
-const myConfig = {
-  passwordPolicy: {
-    regex: /^(?=.*[A-Z]).{8,}$/, // Your custom application policy
-    message: "Password must be 8+ characters with at least one uppercase letter."
-  }
-};
-
-<AuthProvider initialConfig={myConfig}>
+<AuthProvider>
   <App />
 </AuthProvider>
 ```

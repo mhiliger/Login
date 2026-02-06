@@ -25,8 +25,8 @@ const Register = ({
   loginPath = "/login"
 }) => {
   const navigate = useNavigate();
-  const { config } = useAuth();
-  const { regex, message } = config.passwordPolicy;
+  const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%]).{8,24}$/;
+  const message = "8 - 24 characters, must include uppercase and lowercase letters, a number and a special character";
 
   const registrationSchema = Yup.object().shape({
     email: Yup.string().email("Invalid email").required("Required"),

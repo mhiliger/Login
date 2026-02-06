@@ -2,24 +2,12 @@ import React, { createContext, useState, useContext } from "react";
 
 const AuthContext = createContext({});
 
-/**
- * AuthProvider with configurable settings.
- * @param {Object} props
- * @param {Object} [props.initialConfig] - Optional initial configuration (e.g., passwordPolicy)
- */
-export const AuthProvider = ({ children, initialConfig = {} }) => {
+export const AuthProvider = ({ children }) => {
   const [auth, setAuth] = useState({});
   const [user, setUser] = useState(undefined);
-  const [config, setConfig] = useState({
-    passwordPolicy: {
-      regex: /^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%]).{8,24}$/,
-      message: "8 - 24 characters, must include uppercase and lowercase letters, a number and a special character"
-    },
-    ...initialConfig
-  });
 
   return (
-    <AuthContext.Provider value={{ auth, setAuth, user, setUser, config, setConfig }}>
+    <AuthContext.Provider value={{ auth, setAuth, user, setUser }}>
       {children}
     </AuthContext.Provider>
   );
