@@ -66,14 +66,26 @@ The authentication logic has been encapsulated into reusable packages in the `pa
 
 #### Backend Library (`@your-org/auth-be`)
 - **Location**: `packages/auth-be`
-- **Purpose**: Provides factories for Express auth routes and JWT verification middleware.
-- **Integration**: Uses `Login-BE/authAdapter.js` to map library requirements to the project's PostgreSQL database.
-- **Key Exports**: `createAuthRouter` (for `/auth`, `/refresh`, `/logout`) and `createVerifyJWT`.
+- **Purpose**: Provides factories for Express auth routes, registration routes, and JWT verification middleware.
+- **Integration**: Uses `Login-BE/db/index.js` to map library requirements to the project's PostgreSQL database.
+- **Key Exports**: `createAuthRouter`, `createRegistrationRouter`, `createVerifyJWT`, and `createRegistrationLimiter`.
 
 #### Frontend Library (`@your-org/auth-fe`)
 - **Location**: `packages/auth-fe`
-- **Purpose**: Manages React auth state, secure API communication, and route guarding.
-- **Key Exports**: `AuthProvider`, `useAuth`, `useSecureAxios` (auto-refresh interceptor), and `RequireAuth`.
+- **Purpose**: Manages React auth state, registration UI, secure API communication, and route guarding.
+- **Key Exports**: `AuthProvider`, `useAuth`, `useSecureAxios`, `RequireAuth`, `RegistrationRequest`, `EmailVerification`, `PasswordSetup`, `RegistrationSuccess`, `AdminRegistrationList`, and `AdminRegistrationDetail`.
+
+### Registration & Password Reset Workflow
+
+The application implements a multi-phase registration and password reset workflow:
+1.  **Submission**: User submits a registration request (`PENDING_VERIFICATION`).
+2.  **Email Verification**: User verifies their email via a tokenized link (`PENDING_APPROVAL`).
+3.  **Admin Approval**: An administrator approves or rejects the request (`APPROVED` or `REJECTED`).
+4.  **Password Setup/Reset**: Approved users (`APPROVED`) or existing users (`ACTIVE`) set their password via a tokenized link to activate/update their account.
+
+- **Admin-Initiated Reset**: Administrators can initiate a password reset for any user from the User Edit screen, which sends a password setup link to the user.
+- **Rate Limiting**: Registration and verification endpoints are rate-limited using `express-rate-limit` to prevent abuse.
+- **Email Notifications**: A console-based email service (`Login-BE/services/emailService.js`) handles notifications for verification, approval, rejection, and password resets.
 
 ### Permission System
 
@@ -89,12 +101,17 @@ The application has a three-tier access control system: Users -> Roles -> Permis
 -   `Login-BE/index.js`: Backend entry point, server initialization, and route registration.
 -   `Login-BE/middleware/verifyJWT.js`: JWT verification middleware.
 -   `Login-BE/db/index.js`: Database connection configuration.
--   `Login-BE/utilities/getSecret.js`: Google Cloud Secret Manager integration.
+-   `Login-BE/services/emailService.js`: Email notification service (currently console-only).
+-   `Login-BE/emails/PasswordResetEmail.jsx`: Email template for password resets.
+-   `Login-BE/sql/registration/`: SQL migration files for the registration system.
 -   `Login-FE/src/components/AppRoutes.jsx`: Frontend route definitions and permission guards.
--   `Login-FE/src/components/RequireAuth.jsx`: Component for protecting routes based on permissions.
--   `Login-FE/src/context/AuthProvider.jsx`: Authentication context for the frontend.
+-   `Login-FE/src/components/AdminRegistrations.jsx`: Admin interface for managing registration requests.
+-   `Login-FE/src/components/RegistrationRequest.jsx`: Initial registration submission form.
+-   `Login-FE/src/components/UserAED.jsx`: Admin interface for Adding, Editing, and Deleting users, including password reset initiation.
 -   `Login-FE/src/api/axios.js`: Axios configuration for frontend HTTP requests.
--   `Login-FE/vite.config.js`: Vite build and development server configuration.
+-   `Login-FE/src/hooks/data/useUserResetPassword.jsx`: React Query hook for initiating password resets.
+-   `packages/auth-be/src/routes/registrationFactory.js`: Factory for registration and password reset Express routes.
+-   `packages/auth-fe/src/hooks/useAdminRegistrations.js`: React Query hooks for registration management.
 -   `CLAUDE.md`: Existing documentation with more in-depth information.
 
 ## Environment Variables
