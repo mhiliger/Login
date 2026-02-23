@@ -51,7 +51,7 @@ router.post("/auth", async (req, res, next) => {
 
     if (result.length > 0) {
       result.map((perm) => {
-        perms.push(perm.id);
+        perms.push({ id: perm.id, system: perm.system, perm_key: perm.perm_key });
       });
     } else {
       res
@@ -59,7 +59,7 @@ router.post("/auth", async (req, res, next) => {
         .json({ error: "No permissions for user access forbidden" });
       return;
     }
-    let uniquePerms = [...new Set(perms)];
+    let uniquePerms = [...new Map(perms.map((item) => [item.id, item])).values()];
 
     // Create JWT Access Token
     let payload = {

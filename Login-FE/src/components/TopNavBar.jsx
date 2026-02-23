@@ -72,15 +72,26 @@ function TopNavBar() {
               anchorEl={anchorEl}
               MenuListProps={{ ref: menuRef }}
             >
-              <MenuItem onClick={() => handleMenu("/loginadmin/users")}>
-                Manage Users
-              </MenuItem>
-              <MenuItem onClick={() => handleMenu("/loginadmin/roles")}>
-                Manage Roles
-              </MenuItem>
-              <MenuItem onClick={() => handleMenu("/loginadmin/perms")}>
-                Manage Permissions
-              </MenuItem>
+              {auth?.permissions?.some((perm) => perm.perm_key === "AllowUsers") && (
+                <MenuItem onClick={() => handleMenu("/loginadmin/users")}>
+                  Manage Users
+                </MenuItem>
+              )}
+              {auth?.permissions?.some((perm) => perm.perm_key === "AllowUsers") && (
+                <MenuItem onClick={() => handleMenu("/loginadmin/registrations")}>
+                  Manage Registrations
+                </MenuItem>
+              )}
+              {auth?.permissions?.some((perm) => perm.perm_key === "AllowRoles") && (
+                <MenuItem onClick={() => handleMenu("/loginadmin/roles")}>
+                  Manage Roles
+                </MenuItem>
+              )}
+              {auth?.permissions?.some((perm) => perm.perm_key === "AllowPerms") && (
+                <MenuItem onClick={() => handleMenu("/loginadmin/perms")}>
+                  Manage Permissions
+                </MenuItem>
+              )}
             </Menu>
           </>
 

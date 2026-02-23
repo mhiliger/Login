@@ -1,5 +1,7 @@
 SELECT
-    p.id
+    p.id,
+    p.system,
+    p.perm_key
 FROM
     users AS u,
     roles AS r,

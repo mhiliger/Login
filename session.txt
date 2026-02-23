@@ -1,0 +1,1561 @@
+
+ ▐▛███▜▌   Claude Code v2.1.29
+▝▜█████▛▘  Opus 4.5 · API Usage Billing
+  ▘▘ ▝▝    /mnt/projects/Login
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ Plan to implement                                                            │
+│                                                                              │
+│ Registration Workflow Implementation Plan                                    │
+│                                                                              │
+│ Overview                                                                     │
+│                                                                              │
+│ Implement a multi-phase user registration workflow with email verification,  │
+│ admin approval, and credential setup. The implementation adds reusable       │
+│ registration logic to the auth-be and auth-fe packages, then integrates with │
+│  Login-BE and Login-FE.                                                      │
+│                                                                              │
+│ User State Machine                                                           │
+│                                                                              │
+│ PENDING_VERIFICATION → PENDING_APPROVAL → APPROVED → ACTIVE                  │
+│                                         ↘ REJECTED                           │
+│                                                                              │
+│ Configuration Choices                                                        │
+│                                                                              │
+│ - Email Provider: Console-only mode (logs emails to console; Resend          │
+│ integration added later)                                                     │
+│ - Rate Limiting: Yes (express-rate-limit)                                    │
+│ - User Migration: Yes (migrate existing status values)                       │
+│                                                                              │
+│ ---                                                                          │
+│ 1. Database Schema Changes                                                   │
+│                                                                              │
+│ 1.1 Modify Users Table                                                       │
+│                                                                              │
+│ ALTER TABLE public.users                                                     │
+│ ADD COLUMN IF NOT EXISTS request_note VARCHAR(256) DEFAULT 'Requesting login │
+│  id to system',                                                              │
+│ ADD COLUMN IF NOT EXISTS admin_rejection_note TEXT;                          │
+│                                                                              │
+│ 1.2 Create Registration Tokens Table                                         │
+│                                                                              │
+│ CREATE TABLE IF NOT EXISTS public.registration_tokens (                      │
+│     id serial PRIMARY KEY,                                                   │
+│     user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,             │
+│     token_hash TEXT NOT NULL,                                                │
+│     token_type TEXT NOT NULL CHECK (token_type IN ('email_verification',     │
+│ 'password_setup')),                                                          │
+│     expires_at timestamptz NOT NULL,                                         │
+│     used_at timestamptz,                                                     │
+│     created_at timestamptz NOT NULL DEFAULT NOW()                            │
+│ );                                                                           │
+│                                                                              │
+│ CREATE INDEX idx_registration_tokens_user_id ON                              │
+│ public.registration_tokens(user_id);                                         │
+│ CREATE INDEX idx_registration_tokens_token_hash ON                           │
+│ public.registration_tokens(token_hash);                                      │
+│                                                                              │
+│ 1.3 Migrate Existing User Status Values                                      │
+│                                                                              │
+│ -- Map old status values to new ones                                         │
+│ UPDATE public.users SET status = 'ACTIVE' WHERE status = 'Active';           │
+│ UPDATE public.users SET status = 'PENDING_APPROVAL' WHERE status =           │
+│ 'Pending';                                                                   │
+│ UPDATE public.users SET status = 'REJECTED' WHERE status = 'Inactive';       │
+│                                                                              │
+│ 1.4 Status Values                                                            │
+│                                                                              │
+│ - PENDING_VERIFICATION - Initial state after submission                      │
+│ - PENDING_APPROVAL - Email verified, awaiting admin                          │
+│ - APPROVED - Admin approved, awaiting password setup                         │
+│ - ACTIVE - Password set, fully authorized                                    │
+│ - REJECTED - Admin declined request                                          │
+│                                                                              │
+│ ---                                                                          │
+│ 2. auth-be Package Additions                                                 │
+│                                                                              │
+│ 2.1 New Files                                                                │
+│                                                                              │
+│ packages/auth-be/src/                                                        │
+│ ├── routes/registrationFactory.js    # NEW                                   │
+│ ├── middleware/rateLimiter.js        # NEW                                   │
+│ ├── utils/tokenGenerator.js          # NEW                                   │
+│ └── adapters/PostgresAdapter.js      # MODIFY                                │
+│                                                                              │
+│ 2.2 New Routes (registrationFactory.js)                                      │
+│ Method: POST                                                                 │
+│ Path: /register/submit                                                       │
+│ Description: Phase 1: Submit registration                                    │
+│ Auth: Public                                                                 │
+│ Rate Limit: 5/hour                                                           │
+│ ────────────────────────────────────────                                     │
+│ Method: GET                                                                  │
+│ Path: /register/verify/:token                                                │
+│ Description: Phase 2: Verify email                                           │
+│ Auth: Public                                                                 │
+│ Rate Limit: 10/hour                                                          │
+│ ────────────────────────────────────────                                     │
+│ Method: GET                                                                  │
+│ Path: /register/setup/:token                                                 │
+│ Description: Phase 4: Validate setup token                                   │
+│ Auth: Public                                                                 │
+│ Rate Limit: 10/hour                                                          │
+│ ────────────────────────────────────────                                     │
+│ Method: POST                                                                 │
+│ Path: /register/setup/:token                                                 │
+│ Description: Phase 4: Set password                                           │
+│ Auth: Public                                                                 │
+│ Rate Limit: 5/hour                                                           │
+│ ────────────────────────────────────────                                     │
+│ Method: GET                                                                  │
+│ Path: /admin/pending-registrations                                           │
+│ Description: List pending approvals                                          │
+│ Auth: Admin                                                                  │
+│ Rate Limit: None                                                             │
+│ ────────────────────────────────────────                                     │
+│ Method: GET                                                                  │
+│ Path: /admin/registration/:id                                                │
+│ Description: Get single registration                                         │
+│ Auth: Admin                                                                  │
+│ Rate Limit: None                                                             │
+│ ────────────────────────────────────────                                     │
+│ Method: POST                                                                 │
+│ Path: /admin/registration/:id/approve                                        │
+│ Description: Approve registration                                            │
+│ Auth: Admin                                                                  │
+│ Rate Limit: None                                                             │
+│ ────────────────────────────────────────                                     │
+│ Method: POST                                                                 │
+│ Path: /admin/registration/:id/reject                                         │
+│ Description: Reject registration                                             │
+│ Auth: Admin                                                                  │
+│ Rate Limit: None                                                             │
+│ 2.3 Rate Limiter Middleware (rateLimiter.js)                                 │
+│                                                                              │
+│ const rateLimit = require('express-rate-limit');                             │
+│                                                                              │
+│ const createRegistrationLimiter = (config = {}) => {                         │
+│   return rateLimit({                                                         │
+│     windowMs: config.windowMs || 60 * 60 * 1000, // 1 hour                   │
+│     max: config.max || 5,                                                    │
+│     message: { error: 'Too many requests, please try again later' },         │
+│     standardHeaders: true,                                                   │
+│     legacyHeaders: false,                                                    │
+│   });                                                                        │
+│ };                                                                           │
+│                                                                              │
+│ module.exports = { createRegistrationLimiter };                              │
+│                                                                              │
+│ 2.4 Configuration Pattern                                                    │
+│                                                                              │
+│ createRegistrationRouter({                                                   │
+│   db: adapter,                                                               │
+│   config: {                                                                  │
+│     verificationTokenLife: '24h',                                            │
+│     passwordSetupTokenLife: '48h',                                           │
+│     adminPermissionIds: [3],                                                 │
+│     rateLimitWindowMs: 60 * 60 * 1000,  // 1 hour                            │
+│     rateLimitMax: 5,                                                         │
+│                                                                              │
+│     // Email callbacks (dependency injection)                                │
+│     onRegistrationSubmit: async (user, token) => {},                         │
+│     onEmailVerified: async (user) => {},                                     │
+│     onApproval: async (user, token) => {},                                   │
+│     onRejection: async (user, reason) => {}                                  │
+│   }                                                                          │
+│ })                                                                           │
+│                                                                              │
+│ 2.5 PostgresAdapter New Methods                                              │
+│                                                                              │
+│ - createRegistrationRequest(email, first, last, requestNote)                 │
+│ - findUserByEmail(email)                                                     │
+│ - updateUserStatus(userId, status)                                           │
+│ - saveRegistrationToken(userId, tokenHash, tokenType, expiresAt)             │
+│ - findValidToken(tokenHash, tokenType)                                       │
+│ - markTokenUsed(tokenId)                                                     │
+│ - invalidateUserTokens(userId, tokenType)                                    │
+│ - getPendingRegistrations()                                                  │
+│ - getRegistrationById(id)                                                    │
+│ - setAdminRejectionNote(userId, note)                                        │
+│ - setUserPassword(userId, passwordHash)                                      │
+│                                                                              │
+│ 2.6 Token Generator Utility (tokenGenerator.js)                              │
+│                                                                              │
+│ const crypto = require('crypto');                                            │
+│                                                                              │
+│ module.exports = {                                                           │
+│   generateToken: () => {                                                     │
+│     const token = crypto.randomBytes(32).toString('base64url');              │
+│     const tokenHash =                                                        │
+│ crypto.createHash('sha256').update(token).digest('hex');                     │
+│     return { token, tokenHash };                                             │
+│   },                                                                         │
+│   hashToken: (token) => {                                                    │
+│     return crypto.createHash('sha256').update(token).digest('hex');          │
+│   }                                                                          │
+│ };                                                                           │
+│                                                                              │
+│ 2.7 Updated package.json                                                     │
+│                                                                              │
+│ {                                                                            │
+│   "dependencies": {                                                          │
+│     "jsonwebtoken": "^9.0.0",                                                │
+│     "express-rate-limit": "^7.0.0"                                           │
+│   }                                                                          │
+│ }                                                                            │
+│                                                                              │
+│ ---                                                                          │
+│ 3. auth-fe Package Additions                                                 │
+│                                                                              │
+│ 3.1 New Files                                                                │
+│                                                                              │
+│ packages/auth-fe/src/                                                        │
+│ ├── components/                                                              │
+│ │   ├── RegistrationRequest.jsx      # NEW: Phase 1 form                     │
+│ │   ├── EmailVerification.jsx        # NEW: Phase 2 result                   │
+│ │   ├── PasswordSetup.jsx            # NEW: Phase 4 form                     │
+│ │   ├── RegistrationSuccess.jsx      # NEW: Success message                  │
+│ │   ├── AdminRegistrationList.jsx    # NEW: Admin list view                  │
+│ │   └── AdminRegistrationDetail.jsx  # NEW: Admin detail view                │
+│ └── hooks/                                                                   │
+│     ├── useRegistrationSubmit.js     # NEW                                   │
+│     ├── useEmailVerification.js      # NEW                                   │
+│     ├── usePasswordSetup.js          # NEW                                   │
+│     └── useAdminRegistrations.js     # NEW                                   │
+│                                                                              │
+│ 3.2 RegistrationRequest Component                                            │
+│                                                                              │
+│ Phase 1 submission form collecting:                                          │
+│ - email (required)                                                           │
+│ - first name (required)                                                      │
+│ - last name (required)                                                       │
+│ - request note (optional, max 256 chars)                                     │
+│                                                                              │
+│ 3.3 EmailVerification Component                                              │
+│                                                                              │
+│ Phase 2 - displays result of clicking verification link:                     │
+│ - Loading state                                                              │
+│ - Success: "Email verified, awaiting admin review"                           │
+│ - Error: Token expired/invalid/used                                          │
+│                                                                              │
+│ 3.4 PasswordSetup Component                                                  │
+│                                                                              │
+│ Phase 4 - set password after approval:                                       │
+│ - Password field (PWD_REGEX validation)                                      │
+│ - Confirm password field                                                     │
+│ - Redirects to login on success                                              │
+│                                                                              │
+│ 3.5 New Hooks                                                                │
+│                                                                              │
+│ useRegistrationSubmit(axios, url)     // Phase 1 mutation                    │
+│ useEmailVerification(axios, token)    // Phase 2 query                       │
+│ usePasswordSetup(axios)               // Phase 4 mutation                    │
+│ useAdminRegistrations(secureAxios)    // Admin queries/mutations             │
+│                                                                              │
+│ ---                                                                          │
+│ 4. Login-BE Integration                                                      │
+│                                                                              │
+│ 4.1 Files to Create/Modify                                                   │
+│                                                                              │
+│ - sql/registration/alter_users.sql - NEW                                     │
+│ - sql/registration/create_tokens.sql - NEW                                   │
+│ - sql/registration/migrate_status.sql - NEW                                  │
+│ - services/emailService.js - NEW (console-only mode)                         │
+│ - index.js - MODIFY                                                          │
+│                                                                              │
+│ 4.2 Email Service (Console-Only Mode)                                        │
+│                                                                              │
+│ // services/emailService.js                                                  │
+│ // Console-only mode - logs emails for testing                               │
+│ // TODO: Replace with Resend integration for production                      │
+│                                                                              │
+│ const createEmailService = (baseUrl) => {                                    │
+│   const logEmail = (type, to, subject, body) => {                            │
+│     console.log('\n' + '='.repeat(60));                                      │
+│     console.log(`EMAIL [${type}]`);                                          │
+│     console.log('='.repeat(60));                                             │
+│     console.log(`To: ${to}`);                                                │
+│     console.log(`Subject: ${subject}`);                                      │
+│     console.log('-'.repeat(60));                                             │
+│     console.log(body);                                                       │
+│     console.log('='.repeat(60) + '\n');                                      │
+│   };                                                                         │
+│                                                                              │
+│   return {                                                                   │
+│     sendVerificationEmail: async (user, token) => {                          │
+│       const verificationUrl = `${baseUrl}/register/verify/${token}`;         │
+│       logEmail(                                                              │
+│         'VERIFICATION',                                                      │
+│         user.email,                                                          │
+│         'Verify your email address',                                         │
+│         `Welcome, ${user.first}!\n\nVerify your                              │
+│ email:\n${verificationUrl}\n\nExpires in 24 hours.`                          │
+│       );                                                                     │
+│     },                                                                       │
+│                                                                              │
+│     sendAdminNotification: async (user, adminEmail) => {                     │
+│       logEmail(                                                              │
+│         'ADMIN_NOTIFICATION',                                                │
+│         adminEmail,                                                          │
+│         'New Registration Request',                                          │
+│         `Name: ${user.first} ${user.last}\nEmail: ${user.email}\nNote:       │
+│ ${user.request_note}`                                                        │
+│       );                                                                     │
+│     },                                                                       │
+│                                                                              │
+│     sendApprovalEmail: async (user, token) => {                              │
+│       const setupUrl = `${baseUrl}/register/setup/${token}`;                 │
+│       logEmail(                                                              │
+│         'APPROVAL',                                                          │
+│         user.email,                                                          │
+│         'Your account has been approved!',                                   │
+│         `Welcome, ${user.first}!\n\nSet your                                 │
+│ password:\n${setupUrl}\n\nExpires in 48 hours.`                              │
+│       );                                                                     │
+│     },                                                                       │
+│                                                                              │
+│     sendRejectionEmail: async (user, reason) => {                            │
+│       logEmail(                                                              │
+│         'REJECTION',                                                         │
+│         user.email,                                                          │
+│         'Registration Status Update',                                        │
+│         `Your registration was not approved.\n\nReason: ${reason}`           │
+│       );                                                                     │
+│     }                                                                        │
+│   };                                                                         │
+│ };                                                                           │
+│                                                                              │
+│ module.exports = { createEmailService };                                     │
+│                                                                              │
+│ 4.3 Mount Registration Routes in index.js                                    │
+│                                                                              │
+│ // After existing auth routes, BEFORE verifyJWT middleware:                  │
+│ const { createRegistrationRouter } = require("@your-org/auth-be");           │
+│ const { createEmailService } = require("./services/emailService");           │
+│                                                                              │
+│ const baseUrl = 'https://localhost:5173';  // Frontend URL for links         │
+│ const emailService = createEmailService(baseUrl);                            │
+│                                                                              │
+│ app.use("/", createRegistrationRouter({                                      │
+│   db: authAdapter,                                                           │
+│   config: {                                                                  │
+│     verificationTokenLife: '24h',                                            │
+│     passwordSetupTokenLife: '48h',                                           │
+│     adminPermissionIds: [3],                                                 │
+│     adminEmail: 'admin@yourdomain.com',                                      │
+│     onRegistrationSubmit: (user, token) =>                                   │
+│       emailService.sendVerificationEmail(user, token),                       │
+│     onEmailVerified: (user) =>                                               │
+│       emailService.sendAdminNotification(user, 'admin@yourdomain.com'),      │
+│     onApproval: (user, token) =>                                             │
+│       emailService.sendApprovalEmail(user, token),                           │
+│     onRejection: (user, reason) =>                                           │
+│       emailService.sendRejectionEmail(user, reason)                          │
+│   }                                                                          │
+│ }));                                                                         │
+│                                                                              │
+│ 4.4 Future: Add Resend Integration                                           │
+│                                                                              │
+│ When ready to send real emails:                                              │
+│ 1. npm install resend in Login-BE                                            │
+│ 2. Add RESEND_API_KEY to Google Secret Manager                               │
+│ 3. Update emailService.js to use Resend API instead of console.log           │
+│                                                                              │
+│ ---                                                                          │
+│                                                                              │
+│ ## 5. Login-FE Integration                                                   │
+│                                                                              │
+│ ### 5.1 Files to Create/Modify                                               │
+│ - `src/components/RegistrationRequest.jsx` - NEW (wrapper)                   │
+│ - `src/components/EmailVerification.jsx` - NEW (wrapper)                     │
+│ - `src/components/PasswordSetup.jsx` - NEW (wrapper)                         │
+│ - `src/components/RegistrationSuccess.jsx` - NEW (wrapper)                   │
+│ - `src/components/AdminRegistrations.jsx` - NEW                              │
+│ - `src/components/AppRoutes.jsx` - MODIFY                                    │
+│ - `src/constants/userSchema.js` - MODIFY                                     │
+│                                                                              │
+│ ### 5.2 Route Updates                                                        │
+│ ```javascript                                                                │
+│ // New public routes (unauthenticated)                                       │
+│ /register              → RegistrationRequest                                 │
+│ /register/verify/:token → EmailVerification                                  │
+│ /register/setup/:token  → PasswordSetup                                      │
+│ /register/success       → RegistrationSuccess                                │
+│                                                                              │
+│ // New admin route (authenticated, permission 3)                             │
+│ /loginadmin/registrations → AdminRegistrations                               │
+│                                                                              │
+│ 5.3 Update User Status Options                                               │
+│                                                                              │
+│ // userSchema.js                                                             │
+│ export const validStatus = [                                                 │
+│   { id: 1, name: "Pending Verification", value: "PENDING_VERIFICATION" },    │
+│   { id: 2, name: "Pending Approval", value: "PENDING_APPROVAL" },            │
+│   { id: 3, name: "Approved", value: "APPROVED" },                            │
+│   { id: 4, name: "Active", value: "ACTIVE" },                                │
+│   { id: 5, name: "Rejected", value: "REJECTED" },                            │
+│ ];                                                                           │
+│                                                                              │
+│ ---                                                                          │
+│ 6. Security Considerations                                                   │
+│                                                                              │
+│ 1. Token Security: Use crypto.randomBytes(32), store only SHA-256 hash       │
+│ 2. Enumeration Prevention: Return generic success on duplicate email         │
+│ 3. Rate Limiting: 5 req/hour on submit/setup, 10 req/hour on verify          │
+│ 4. Password Hashing: Use existing bcrypt pattern with crypt() and            │
+│ gen_salt('bf')                                                               │
+│ 5. Admin Authorization: Verify permission before admin operations            │
+│ 6. Token Expiration: 24h for verification, 48h for password setup            │
+│                                                                              │
+│ ---                                                                          │
+│ 7. Verification / Testing                                                    │
+│                                                                              │
+│ Manual Testing Checklist                                                     │
+│                                                                              │
+│ 1. Phase 1: Submit registration → user created with PENDING_VERIFICATION →   │
+│ verification URL logged to console                                           │
+│ 2. Phase 2: Copy verification URL from console, navigate to it → status      │
+│ updates to PENDING_APPROVAL → admin notification logged                      │
+│ 3. Phase 3: Admin approves → status updates to APPROVED → setup URL logged   │
+│ to console                                                                   │
+│ 4. Phase 3 (alt): Admin rejects with reason → status updates to REJECTED →   │
+│ rejection logged                                                             │
+│ 5. Phase 4: Copy setup URL from console, navigate to it → set password →     │
+│ status updates to ACTIVE → can login                                         │
+│ 6. Rate Limiting: Verify 429 response after exceeding limits                 │
+│ 7. Migration: Verify existing users have correct new status values           │
+│                                                                              │
+│ ---                                                                          │
+│ 8. Critical Files Summary                                                    │
+│                                                                              │
+│ auth-be Package                                                              │
+│ File: packages/auth-be/src/index.js                                          │
+│ Action: MODIFY - Add exports                                                 │
+│ ────────────────────────────────────────                                     │
+│ File: packages/auth-be/src/routes/registrationFactory.js                     │
+│ Action: NEW                                                                  │
+│ ────────────────────────────────────────                                     │
+│ File: packages/auth-be/src/middleware/rateLimiter.js                         │
+│ Action: NEW                                                                  │
+│ ────────────────────────────────────────                                     │
+│ File: packages/auth-be/src/utils/tokenGenerator.js                           │
+│ Action: NEW                                                                  │
+│ ────────────────────────────────────────                                     │
+│ File: packages/auth-be/src/adapters/PostgresAdapter.js                       │
+│ Action: MODIFY - Add methods                                                 │
+│ ────────────────────────────────────────                                     │
+│ File: packages/auth-be/package.json                                          │
+│ Action: MODIFY - Add express-rate-limit                                      │
+│ auth-fe Package                                                              │
+│ File: packages/auth-fe/src/index.js                                          │
+│ Action: MODIFY - Add exports                                                 │
+│ ────────────────────────────────────────                                     │
+│ File: packages/auth-fe/src/components/RegistrationRequest.jsx                │
+│ Action: NEW                                                                  │
+│ ────────────────────────────────────────                                     │
+│ File: packages/auth-fe/src/components/EmailVerification.jsx                  │
+│ Action: NEW                                                                  │
+│ ────────────────────────────────────────                                     │
+│ File: packages/auth-fe/src/components/PasswordSetup.jsx                      │
+│ Action: NEW                                                                  │
+│ ────────────────────────────────────────                                     │
+│ File: packages/auth-fe/src/components/RegistrationSuccess.jsx                │
+│ Action: NEW                                                                  │
+│ ────────────────────────────────────────                                     │
+│ File: packages/auth-fe/src/components/AdminRegistrationList.jsx              │
+│ Action: NEW                                                                  │
+│ ────────────────────────────────────────                                     │
+│ File: packages/auth-fe/src/components/AdminRegistrationDetail.jsx            │
+│ Action: NEW                                                                  │
+│ ────────────────────────────────────────                                     │
+│ File: packages/auth-fe/src/hooks/useRegistrationSubmit.js                    │
+│ Action: NEW                                                                  │
+│ ────────────────────────────────────────                                     │
+│ File: packages/auth-fe/src/hooks/useEmailVerification.js                     │
+│ Action: NEW                                                                  │
+│ ────────────────────────────────────────                                     │
+│ File: packages/auth-fe/src/hooks/usePasswordSetup.js                         │
+│ Action: NEW                                                                  │
+│ ────────────────────────────────────────                                     │
+│ File: packages/auth-fe/src/hooks/useAdminRegistrations.js                    │
+│ Action: NEW                                                                  │
+│ Login-BE                                                                     │
+│ ┌──────────────────────────────────────────────┬─────────────────────────┐   │
+│ │                     File                     │         Action          │   │
+│ ├──────────────────────────────────────────────┼─────────────────────────┤   │
+│ │ Login-BE/index.js                            │ MODIFY - Mount routes   │   │
+│ ├──────────────────────────────────────────────┼─────────────────────────┤   │
+│ │ Login-BE/services/emailService.js            │ NEW (console-only mode) │   │
+│ ├──────────────────────────────────────────────┼─────────────────────────┤   │
+│ │ Login-BE/sql/registration/alter_users.sql    │ NEW                     │   │
+│ ├──────────────────────────────────────────────┼─────────────────────────┤   │
+│ │ Login-BE/sql/registration/create_tokens.sql  │ NEW                     │   │
+│ ├──────────────────────────────────────────────┼─────────────────────────┤   │
+│ │ Login-BE/sql/registration/migrate_status.sql │ NEW                     │   │
+│ └──────────────────────────────────────────────┴─────────────────────────┘   │
+│ Login-FE                                                                     │
+│ File: Login-FE/src/components/AppRoutes.jsx                                  │
+│ Action: MODIFY - Add routes                                                  │
+│ ────────────────────────────────────────                                     │
+│ File: Login-FE/src/components/RegistrationRequest.jsx                        │
+│ Action: NEW                                                                  │
+│ ────────────────────────────────────────                                     │
+│ File: Login-FE/src/components/EmailVerification.jsx                          │
+│ Action: NEW                                                                  │
+│ ────────────────────────────────────────                                     │
+│ File: Login-FE/src/components/PasswordSetup.jsx                              │
+│ Action: NEW                                                                  │
+│ ────────────────────────────────────────                                     │
+│ File: Login-FE/src/components/RegistrationSuccess.jsx                        │
+│ Action: NEW                                                                  │
+│ ────────────────────────────────────────                                     │
+│ File: Login-FE/src/components/AdminRegistrations.jsx                         │
+│ Action: NEW                                                                  │
+│ ────────────────────────────────────────                                     │
+│ File: Login-FE/src/constants/userSchema.js                                   │
+│ Action: MODIFY - Update status values                                        │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+● I'll implement this registration workflow plan. Let me start by reading the
+  key files to understand the current structure, then implement the changes
+  systematically.
+
+● Explore(Explore current codebase structure)
+  ⎿  Done (20 tool uses · 23.6k tokens · 29s)
+
+● Now let me read a few more files to understand the exact patterns used:
+
+● Read 7 files (ctrl+o to expand)
+
+● Let me also check the existing auth-fe Register component and
+  StandardAuthRoutes to understand how to integrate:
+
+● Read 3 files (ctrl+o to expand)
+
+● Now I have a good understanding. Let me create the task list and begin
+  implementation. I'll start with the backend components first.
+
+● Bash(mkdir -p /mnt/projects/Login/Login-BE/sql/registration)
+  ⎿  (No content)
+
+● Write(Login-BE/sql/registration/alter_users.sql)
+  ⎿  Wrote 8 lines to Login-BE/sql/registration/alter_users.sql
+      1 -- Add columns to users table for registration workflow
+      2 -- request_note: User's note explaining why they need access
+      3 -- admin_rejection_note: Admin's reason for rejecting (if applica
+        ble)
+      4 
+      5 ALTER TABLE public.users
+      6 ADD COLUMN IF NOT EXISTS request_note VARCHAR(256) DEFAULT 'Reque
+        sting login id to system',
+      7 ADD COLUMN IF NOT EXISTS admin_rejection_note TEXT;
+
+● Write(Login-BE/sql/registration/create_tokens.sql)
+  ⎿  Wrote 14 lines to Login-BE/sql/registration/create_tokens.sql
+       1 -- Create registration tokens table for email verification and p
+         assword setup
+       2 CREATE TABLE IF NOT EXISTS public.registration_tokens (
+       3     id SERIAL PRIMARY KEY,
+       4     user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+       5     token_hash TEXT NOT NULL,
+       6     token_type TEXT NOT NULL CHECK (token_type IN ('email_verifi
+         cation', 'password_setup')),
+       7     expires_at TIMESTAMPTZ NOT NULL,
+       8     used_at TIMESTAMPTZ,
+       9     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      10 );
+     … +4 lines (ctrl+o to expand)
+
+● Write(Login-BE/sql/registration/migrate_status.sql)
+  ⎿  Wrote 8 lines to Login-BE/sql/registration/migrate_status.sql
+      1 -- Migrate existing user status values to new registration workfl
+        ow status values
+      2 -- Old values: 'Pending', 'Active', 'Inactive'
+      3 -- New values: 'PENDING_VERIFICATION', 'PENDING_APPROVAL', 'APPRO
+        VED', 'ACTIVE', 'REJECTED'
+      4 
+      5 UPDATE public.users SET status = 'ACTIVE' WHERE status = 'Active'
+        ;
+      6 UPDATE public.users SET status = 'PENDING_APPROVAL' WHERE status 
+        = 'Pending';
+      7 UPDATE public.users SET status = 'REJECTED' WHERE status = 'Inact
+        ive';
+
+● Bash(mkdir -p /mnt/projects/Login/packages/auth-be/src/utils)
+  ⎿  (No content)
+
+● Write(packages/auth-be/src/utils/tokenGenerator.js)
+  ⎿  Wrote 27 lines to packages/auth-be/src/utils/tokenGenerator.js
+       1 const crypto = require("crypto");
+       2 
+       3 /**
+       4  * Generates a secure random token and its hash.
+       5  * The plain token is sent to the user, while only the hash is s
+         tored in the database.
+       6  * @returns {{ token: string, tokenHash: string }}
+       7  */
+       8 const generateToken = () => {
+       9   const token = crypto.randomBytes(32).toString("base64url");
+      10   const tokenHash = crypto.createHash("sha256").update(token).di
+         gest("hex");
+     … +17 lines (ctrl+o to expand)
+
+● Write(packages/auth-be/src/middleware/rateLimiter.js)
+  ⎿  Wrote 41 lines to packages/auth-be/src/middleware/rateLimiter.js
+       1 const rateLimit = require("express-rate-limit");
+       2 
+       3 /**
+       4  * Creates a rate limiter for registration endpoints.
+       5  * @param {Object} config - Configuration options.
+       6  * @param {number} [config.windowMs=3600000] - Time window in mi
+         lliseconds (default: 1 hour).
+       7  * @param {number} [config.max=5] - Maximum requests per window 
+         (default: 5).
+       8  * @returns {Function} Express rate limiting middleware.
+       9  */
+      10 const createRegistrationLimiter = (config = {}) => {
+     … +31 lines (ctrl+o to expand)
+
+❯ can you write the plan to reg_plan.md so i can go through the solution    
+  when done?                                                                
+
+● Let me save the plan to a file and then continue with the implementation.
+
+● Read 1 file (ctrl+o to expand)
+
+● I see there's already a reg_workflow.md file. Let me write the detailed
+  implementation plan to reg_plan.md as you requested.
+
+● Write(reg_plan.md)
+  ⎿  Wrote 427 lines to reg_plan.md
+       1 # Registration Workflow Implementation Plan
+       2 
+       3 ## Overview
+       4 
+       5 Implement a multi-phase user registration workflow with email ve
+         rification, admin approval, and credential setup. The implementa
+         tion adds reusable registration logic to the `auth-be` and `auth
+         -fe` packages, then integrates with Login-BE and Login-FE.
+       6 
+       7 ### User State Machine
+       8 ```
+       9 PENDING_VERIFICATION → PENDING_APPROVAL → APPROVED → ACTIVE
+      10                                         ↘ REJECTED
+     … +417 lines (ctrl+o to expand)
+
+● I've written the plan to reg_plan.md. Now let me continue with the
+  implementation. I was working on task #4 (rateLimiter) which is complete.
+
+● Now let me add the registration methods to the PostgresAdapter:
+
+● Update(packages/auth-be/src/adapters/PostgresAdapter.js)
+  ⎿  Added 151 lines, removed 1 line
+      1  /**
+      2   * A standard Postgres adapter for the authentication library.
+      3   * Assumes a schema with 'users', 'roles', 'permissions', 'UserR
+         oles', and 'RolePerms' tables.
+      4 - *                                                              
+      4 + *                                                              
+      5   * @param {Object} db - A database connection object (e.g., pg-p
+         romise instance).
+      6   * @returns {Object} An auth adapter implementation.
+      7   */
+     ...
+       56     */
+       57    clearRefreshToken: async (userId) => {
+       58      return await db.none("UPDATE users SET refreshtoken = '' W
+           HERE id = $1", [userId]);
+       59 +  },                                                          
+       60 +                                                              
+       61 +  // ==================== Registration Workflow Methods ======
+          +==============                                                
+       62 +                                                              
+       63 +  /**                                                         
+       64 +   * Finds a user by their email address.                     
+       65 +   * @param {string} email - The email to search for.         
+       66 +   * @returns {Object|null} The user record or null if not fou
+          +nd.                                                           
+       67 +   */                                                         
+       68 +  findUserByEmail: async (email) => {                         
+       69 +    const result = await db.manyOrNone(                       
+       70 +      "SELECT id, email, first, last, status, request_note, ad
+          +min_rejection_note FROM users WHERE email = $1",              
+       71 +      [email]                                                 
+       72 +    );                                                        
+       73 +    return result.length > 0 ? result[0] : null;              
+       74 +  },                                                          
+       75 +                                                              
+       76 +  /**                                                         
+       77 +   * Creates a new registration request (user with PENDING_VER
+          +IFICATION status).                                            
+       78 +   * @param {string} email - User's email address.            
+       79 +   * @param {string} first - User's first name.               
+       80 +   * @param {string} last - User's last name.                 
+       81 +   * @param {string} requestNote - User's note explaining why 
+          +they need access.                                             
+       82 +   * @returns {Object} The created user record.               
+       83 +   */                                                         
+       84 +  createRegistrationRequest: async (email, first, last, reques
+          +tNote) => {                                                   
+       85 +    const result = await db.one(                              
+       86 +      `INSERT INTO users (email, first, last, status, request_
+          +note)                                                         
+       87 +       VALUES ($1, $2, $3, 'PENDING_VERIFICATION', $4)        
+       88 +       RETURNING id, email, first, last, status, request_note`
+          +,                                                             
+       89 +      [email, first, last, requestNote || "Requesting login id
+          + to system"]                                                  
+       90 +    );                                                        
+       91 +    return result;                                            
+       92 +  },                                                          
+       93 +                                                              
+       94 +  /**                                                         
+       95 +   * Updates a user's status.                                 
+       96 +   * @param {number} userId - The user's ID.                  
+       97 +   * @param {string} status - The new status value.           
+       98 +   */                                                         
+       99 +  updateUserStatus: async (userId, status) => {               
+      100 +    return await db.none("UPDATE users SET status = $1 WHERE i
+          +d = $2", [status, userId]);                                   
+      101 +  },                                                          
+      102 +                                                              
+      103 +  /**                                                         
+      104 +   * Saves a registration token (email verification or passwor
+          +d setup).                                                     
+      105 +   * @param {number} userId - The user's ID.                  
+      106 +   * @param {string} tokenHash - SHA-256 hash of the token.   
+      107 +   * @param {string} tokenType - 'email_verification' or 'pass
+          +word_setup'.                                                  
+      108 +   * @param {Date} expiresAt - Token expiration timestamp.    
+      109 +   * @returns {Object} The created token record.              
+      110 +   */                                                         
+      111 +  saveRegistrationToken: async (userId, tokenHash, tokenType, 
+          +expiresAt) => {                                               
+      112 +    const result = await db.one(                              
+      113 +      `INSERT INTO registration_tokens (user_id, token_hash, t
+          +oken_type, expires_at)                                        
+      114 +       VALUES ($1, $2, $3, $4)                                
+      115 +       RETURNING id, user_id, token_type, expires_at, created_
+          +at`,                                                          
+      116 +      [userId, tokenHash, tokenType, expiresAt]               
+      117 +    );                                                        
+      118 +    return result;                                            
+      119 +  },                                                          
+      120 +                                                              
+      121 +  /**                                                         
+      122 +   * Finds a valid (unexpired, unused) token by its hash.     
+      123 +   * @param {string} tokenHash - SHA-256 hash of the token.   
+      124 +   * @param {string} tokenType - 'email_verification' or 'pass
+          +word_setup'.                                                  
+      125 +   * @returns {Object|null} The token record with user info, o
+          +r null if not found/invalid.                                  
+      126 +   */                                                         
+      127 +  findValidToken: async (tokenHash, tokenType) => {           
+      128 +    const result = await db.manyOrNone(                       
+      129 +      `SELECT t.id, t.user_id, t.token_type, t.expires_at, t.u
+          +sed_at,                                                       
+      130 +              u.email, u.first, u.last, u.status, u.request_no
+          +te                                                            
+      131 +       FROM registration_tokens t                             
+      132 +       JOIN users u ON t.user_id = u.id                       
+      133 +       WHERE t.token_hash = $1                                
+      134 +         AND t.token_type = $2                                
+      135 +         AND t.expires_at > NOW()                             
+      136 +         AND t.used_at IS NULL`,                              
+      137 +      [tokenHash, tokenType]                                  
+      138 +    );                                                        
+      139 +    return result.length > 0 ? result[0] : null;              
+      140 +  },                                                          
+      141 +                                                              
+      142 +  /**                                                         
+      143 +   * Marks a token as used.                                   
+      144 +   * @param {number} tokenId - The token's ID.                
+      145 +   */                                                         
+      146 +  markTokenUsed: async (tokenId) => {                         
+      147 +    return await db.none("UPDATE registration_tokens SET used_
+          +at = NOW() WHERE id = $1", [tokenId]);                        
+      148 +  },                                                          
+      149 +                                                              
+      150 +  /**                                                         
+      151 +   * Invalidates all tokens of a specific type for a user.    
+      152 +   * @param {number} userId - The user's ID.                  
+      153 +   * @param {string} tokenType - 'email_verification' or 'pass
+          +word_setup'.                                                  
+      154 +   */                                                         
+      155 +  invalidateUserTokens: async (userId, tokenType) => {        
+      156 +    return await db.none(                                     
+      157 +      "UPDATE registration_tokens SET used_at = NOW() WHERE us
+          +er_id = $1 AND token_type = $2 AND used_at IS NULL",          
+      158 +      [userId, tokenType]                                     
+      159 +    );                                                        
+      160 +  },                                                          
+      161 +                                                              
+      162 +  /**                                                         
+      163 +   * Gets all users with PENDING_APPROVAL status.             
+      164 +   * @returns {Array} List of pending registration requests.  
+      165 +   */                                                         
+      166 +  getPendingRegistrations: async () => {                      
+      167 +    return await db.manyOrNone(                               
+      168 +      `SELECT id, email, first, last, status, request_note, ad
+          +min_rejection_note                                            
+      169 +       FROM users                                             
+      170 +       WHERE status = 'PENDING_APPROVAL'                      
+      171 +       ORDER BY id DESC`                                      
+      172 +    );                                                        
+      173 +  },                                                          
+      174 +                                                              
+      175 +  /**                                                         
+      176 +   * Gets a single registration by user ID.                   
+      177 +   * @param {number} id - The user's ID.                      
+      178 +   * @returns {Object|null} The user record or null if not fou
+          +nd.                                                           
+      179 +   */                                                         
+      180 +  getRegistrationById: async (id) => {                        
+      181 +    const result = await db.manyOrNone(                       
+      182 +      `SELECT id, email, first, last, status, request_note, ad
+          +min_rejection_note                                            
+      183 +       FROM users                                             
+      184 +       WHERE id = $1`,                                        
+      185 +      [id]                                                    
+      186 +    );                                                        
+      187 +    return result.length > 0 ? result[0] : null;              
+      188 +  },                                                          
+      189 +                                                              
+      190 +  /**                                                         
+      191 +   * Sets the admin rejection note for a user.                
+      192 +   * @param {number} userId - The user's ID.                  
+      193 +   * @param {string} note - The rejection reason.             
+      194 +   */                                                         
+      195 +  setAdminRejectionNote: async (userId, note) => {            
+      196 +    return await db.none("UPDATE users SET admin_rejection_not
+          +e = $1 WHERE id = $2", [note, userId]);                       
+      197 +  },                                                          
+      198 +                                                              
+      199 +  /**                                                         
+      200 +   * Sets the user's password using PostgreSQL crypt function.
+      201 +   * @param {number} userId - The user's ID.                  
+      202 +   * @param {string} password - The plain text password (will 
+          +be hashed).                                                   
+      203 +   */                                                         
+      204 +  setUserPassword: async (userId, password) => {              
+      205 +    return await db.none(                                     
+      206 +      "UPDATE users SET password = crypt($1, gen_salt('bf')) W
+          +HERE id = $2",                                                
+      207 +      [password, userId]                                      
+      208 +    );                                                        
+      209    }
+      210  });
+      211  
+
+● Now let me create the registrationFactory.js routes:
+
+● Write(packages/auth-be/src/routes/registrationFactory.js)
+  ⎿  Wrote 432 lines to packages/auth-be/src/routes/registrationFactory.js
+       1 const express = require("express");
+       2 const { generateToken, hashToken } = require("../utils/tokenGene
+         rator");
+       3 const { createRegistrationLimiter, createVerificationLimiter } =
+          require("../middleware/rateLimiter");
+       4 
+       5 /**
+       6  * Parses a duration string (e.g., '24h', '48h') into millisecon
+         ds.
+       7  * @param {string} duration - Duration string like '24h', '1d', 
+         '30m'.
+       8  * @returns {number} Milliseconds.
+       9  */
+      10 const parseDuration = (duration) => {
+     … +422 lines (ctrl+o to expand)
+
+❯ /stats 
+
+● Now let me update the auth-be package.json and index.js:
+
+● Update(packages/auth-be/package.json)
+  ⎿  Added 2 lines, removed 1 line
+       7      "test": "echo \"Error: no test specified\" && exit 1"
+       8    },
+       9    "dependencies": {
+      10 -    "jsonwebtoken": "^9.0.0"                                   
+      10 +    "jsonwebtoken": "^9.0.0",                                  
+      11 +    "express-rate-limit": "^7.0.0"                             
+      12    },
+      13    "peerDependencies": {
+      14      "express": "^4.0.0"
+
+● Update(packages/auth-be/src/index.js)
+  ⎿  Added 8 lines
+       1  const createAuthRouter = require("./routes/authFactory");
+       2 +const createRegistrationRouter = require("./routes/registration
+         +Factory");                                                     
+       3  const createVerifyJWT = require("./middleware/verifyJWT");
+       4  const createPostgresAdapter = require("./adapters/PostgresAdapt
+          er");
+       5 +const { createRegistrationLimiter, createVerificationLimiter } 
+         += require("./middleware/rateLimiter");                         
+       6 +const { generateToken, hashToken } = require("./utils/tokenGene
+         +rator");                                                       
+       7  
+       8  module.exports = {
+       9    createAuthRouter,
+      10 +  createRegistrationRouter,                                    
+      11    createVerifyJWT,
+      12    createPostgresAdapter,
+      13 +  createRegistrationLimiter,                                   
+      14 +  createVerificationLimiter,                                   
+      15 +  generateToken,                                               
+      16 +  hashToken,                                                   
+      17  };
+      18   No newline at end of file
+
+● Now let's create the auth-fe hooks:
+
+● Write(packages/auth-fe/src/hooks/useRegistrationSubmit.js)
+  ⎿  Wrote 24 lines to packages/auth-fe/src/hooks/useRegistrationSubmit.js
+       1 import { useMutation } from "@tanstack/react-query";
+       2 
+       3 /**
+       4  * Hook for submitting a registration request.
+       5  * @param {Object} axios - Axios instance for API calls.
+       6  * @param {string} [url='/register/submit'] - Registration endpo
+         int URL.
+       7  * @returns {Object} TanStack Query mutation object.
+       8  */
+       9 const useRegistrationSubmit = (axios, url = "/register/submit") 
+         => {
+      10   return useMutation({
+     … +14 lines (ctrl+o to expand)
+
+● Write(packages/auth-fe/src/hooks/useEmailVerification.js)
+  ⎿  Wrote 27 lines to packages/auth-fe/src/hooks/useEmailVerification.js
+       1 import { useQuery } from "@tanstack/react-query";
+       2 
+       3 /**
+       4  * Hook for verifying an email with a token.
+       5  * @param {Object} axios - Axios instance for API calls.
+       6  * @param {string} token - Verification token from the URL.
+       7  * @param {string} [baseUrl='/register/verify'] - Verification e
+         ndpoint base URL.
+       8  * @returns {Object} TanStack Query query object.
+       9  */
+      10 const useEmailVerification = (axios, token, baseUrl = "/register
+         /verify") => {
+     … +17 lines (ctrl+o to expand)
+
+● Write(packages/auth-fe/src/hooks/usePasswordSetup.js)
+  ⎿  Wrote 62 lines to packages/auth-fe/src/hooks/usePasswordSetup.js
+       1 import { useQuery, useMutation } from "@tanstack/react-query";
+       2 
+       3 /**
+       4  * Hook for validating a password setup token.
+       5  * @param {Object} axios - Axios instance for API calls.
+       6  * @param {string} token - Password setup token from the URL.
+       7  * @param {string} [baseUrl='/register/setup'] - Setup endpoint 
+         base URL.
+       8  * @returns {Object} TanStack Query query object.
+       9  */
+      10 export const useValidateSetupToken = (axios, token, baseUrl = "/
+         register/setup") => {
+     … +52 lines (ctrl+o to expand)
+
+● Write(packages/auth-fe/src/hooks/useAdminRegistrations.js)
+  ⎿  Wrote 102 lines to packages/auth-fe/src/hooks/useAdminRegistrations.js
+       1 import { useQuery, useMutation, useQueryClient } from "@tanstack
+         /react-query";
+       2 
+       3 /**
+       4  * Hook for fetching pending registrations (admin).
+       5  * @param {Object} secureAxios - Authenticated axios instance.
+       6  * @param {string} [url='/admin/pending-registrations'] - Endpoi
+         nt URL.
+       7  * @returns {Object} TanStack Query query object.
+       8  */
+       9 export const usePendingRegistrations = (secureAxios, url = "/adm
+         in/pending-registrations") => {
+      10   return useQuery({
+     … +92 lines (ctrl+o to expand)
+  ⎿ Credit balance too low · Add funds: 
+
+✻ Cogitated for 4m 57s
+
+❯ just added credits 
+
+● Got it, continuing with the auth-fe registration components.
+
+● Write(packages/auth-fe/src/components/RegistrationRequest.jsx)
+  ⎿  Wrote 175 lines to
+     packages/auth-fe/src/components/RegistrationRequest.jsx
+       1 import React from "react";
+       2 import { useForm } from "react-hook-form";
+       3 import { yupResolver } from "@hookform/resolvers/yup";
+       4 import * as Yup from "yup";
+       5 import { NavLink } from "react-router-dom";
+       6 
+       7 /**
+       8  * Registration request form component (Phase 1).
+       9  * @param {Object} props
+      10  * @param {React.Component} props.TextField - Text input compone
+         nt.
+     … +165 lines (ctrl+o to expand)
+
+● Write(packages/auth-fe/src/components/EmailVerification.jsx)
+  ⎿  Wrote 106 lines to
+     packages/auth-fe/src/components/EmailVerification.jsx
+       1 import React from "react";
+       2 import { NavLink } from "react-router-dom";
+       3 
+       4 /**
+       5  * Email verification result component (Phase 2).
+       6  * @param {Object} props
+       7  * @param {React.Component} props.Box - Box/Container component.
+       8  * @param {React.Component} props.Typography - Typography compon
+         ent.
+       9  * @param {React.Component} props.Alert - Alert component for me
+         ssages.
+      10  * @param {React.Component} props.CircularProgress - Loading spi
+         nner component.
+     … +96 lines (ctrl+o to expand)
+
+● Write(packages/auth-fe/src/components/PasswordSetup.jsx)
+  ⎿  Wrote 204 lines to packages/auth-fe/src/components/PasswordSetup.jsx
+       1 import React from "react";
+       2 import { useForm } from "react-hook-form";
+       3 import { yupResolver } from "@hookform/resolvers/yup";
+       4 import * as Yup from "yup";
+       5 import { NavLink } from "react-router-dom";
+       6 
+       7 /**
+       8  * Password setup form component (Phase 4).
+       9  * @param {Object} props
+      10  * @param {React.Component} props.TextField - Text input compone
+         nt.
+     … +194 lines (ctrl+o to expand)
+
+● Write(packages/auth-fe/src/components/RegistrationSuccess.jsx)
+  ⎿  Wrote 42 lines to
+     packages/auth-fe/src/components/RegistrationSuccess.jsx
+       1 import React from "react";
+       2 import { NavLink } from "react-router-dom";
+       3 
+       4 /**
+       5  * Registration success message component.
+       6  * @param {Object} props
+       7  * @param {React.Component} props.Box - Box/Container component.
+       8  * @param {React.Component} props.Typography - Typography compon
+         ent.
+       9  * @param {React.Component} props.Alert - Alert component for me
+         ssages.
+      10  * @param {string} [props.title='Registration Complete'] - Page 
+         title.
+     … +32 lines (ctrl+o to expand)
+
+● Write(packages/auth-fe/src/components/AdminRegistrationList.jsx)
+  ⎿  Wrote 190 lines to
+     packages/auth-fe/src/components/AdminRegistrationList.jsx
+       1 import React from "react";
+       2 
+       3 /**
+       4  * Admin registration list component.
+       5  * @param {Object} props
+       6  * @param {React.Component} props.Box - Box/Container component.
+       7  * @param {React.Component} props.Typography - Typography compon
+         ent.
+       8  * @param {React.Component} props.Button - Button component.
+       9  * @param {React.Component} props.Alert - Alert component for me
+         ssages.
+      10  * @param {React.Component} props.CircularProgress - Loading spi
+         nner component.
+     … +180 lines (ctrl+o to expand)
+
+● Write(packages/auth-fe/src/components/AdminRegistrationDetail.jsx)
+  ⎿  Wrote 269 lines to
+     packages/auth-fe/src/components/AdminRegistrationDetail.jsx
+       1 import React, { useState } from "react";
+       2 
+       3 /**
+       4  * Admin registration detail component with approve/reject actio
+         ns.
+       5  * @param {Object} props
+       6  * @param {React.Component} props.Box - Box/Container component.
+       7  * @param {React.Component} props.Typography - Typography compon
+         ent.
+       8  * @param {React.Component} props.Button - Button component.
+       9  * @param {React.Component} props.TextField - Text input compone
+         nt (for rejection reason).
+      10  * @param {React.Component} props.Alert - Alert component for me
+         ssages.
+     … +259 lines (ctrl+o to expand)
+
+● Update(packages/auth-fe/src/index.js)
+  ⎿  Added 21 lines, removed 1 line
+       6  export { default as StandardAuthRoutes } from "./components/Sta
+          ndardAuthRoutes";
+       7  export { default as Login } from "./components/Login";
+       8  export { default as Register } from "./components/Register";
+       9 -export { default as Unauthorized } from "./components/Unauthori
+         -zed";                                                          
+       9   No newline at end of file
+      10 +export { default as Unauthorized } from "./components/Unauthori
+         +zed";                                                          
+      11 +                                                               
+      12 +// Registration workflow components                            
+      13 +export { default as RegistrationRequest } from "./components/Re
+         +gistrationRequest";                                            
+      14 +export { default as EmailVerification } from "./components/Emai
+         +lVerification";                                                
+      15 +export { default as PasswordSetup } from "./components/Password
+         +Setup";                                                        
+      16 +export { default as RegistrationSuccess } from "./components/Re
+         +gistrationSuccess";                                            
+      17 +export { default as AdminRegistrationList } from "./components/
+         +AdminRegistrationList";                                        
+      18 +export { default as AdminRegistrationDetail } from "./component
+         +s/AdminRegistrationDetail";                                    
+      19 +                                                               
+      20 +// Registration workflow hooks                                 
+      21 +export { default as useRegistrationSubmit } from "./hooks/useRe
+         +gistrationSubmit";                                             
+      22 +export { default as useEmailVerification } from "./hooks/useEma
+         +ilVerification";                                               
+      23 +export { default as usePasswordSetup, useValidateSetupToken, us
+         +eSetPassword } from "./hooks/usePasswordSetup";                
+      24 +export {                                                       
+      25 +  default as useAdminRegistrations,                            
+      26 +  usePendingRegistrations,                                     
+      27 +  useRegistration,                                             
+      28 +  useApproveRegistration,                                      
+      29 +  useRejectRegistration,                                       
+      30 +} from "./hooks/useAdminRegistrations";                        
+      31   No newline at end of file
+
+● Bash(mkdir -p /mnt/projects/Login/Login-BE/services)
+  ⎿  (No content)
+
+● Write(Login-BE/services/emailService.js)
+  ⎿  Wrote 109 lines to Login-BE/services/emailService.js
+       1 /**
+       2  * Email Service - Console-Only Mode
+       3  *
+       4  * This service logs emails to the console for testing and devel
+         opment.
+       5  * To send real emails, replace the logEmail calls with a provid
+         er like Resend.
+       6  *
+       7  * Future Resend integration:
+       8  * 1. npm install resend
+       9  * 2. Add RESEND_API_KEY to Google Secret Manager
+      10  * 3. Replace logEmail calls with Resend API calls
+     … +99 lines (ctrl+o to expand)
+
+● Update(Login-BE/index.js)
+  ⎿  Added 2 lines, removed 1 line
+      50  
+      51  function startServer() {
+      52    const app = express();
+      53 -  const { createAuthRouter, createVerifyJWT, createPostgresAdap
+         -ter } = require("@your-org/auth-be");                          
+      53 +  const { createAuthRouter, createRegistrationRouter, createVer
+         +ifyJWT, createPostgresAdapter } = require("@your-org/auth-be");
+      54    const db = require("./db/index.js");
+      55    const authAdapter = createPostgresAdapter(db);
+      56 +  const { createEmailService } = require("./services/emailServi
+         +ce");                                                          
+      57  
+      58    app.use(cors({
+      59      origin: ["https://rest.hiliger.com:3000", "https://localhos
+          t:5173", "https://localhost:5174", "https://127.0.0.1:5173"],
+
+● Update(Login-BE/index.js)
+  ⎿  Added 26 lines, removed 3 lines
+      74    };
+      75  
+      76    // Mount Auth Routes (login, refresh, logout)
+      77 -  app.use("/", createAuthRouter({                              
+      78 -    db: authAdapter,                                           
+      79 -    config: authConfig                                         
+      77 +  app.use("/", createAuthRouter({                              
+      78 +    db: authAdapter,                                           
+      79 +    config: authConfig                                         
+      80    }));
+      81  
+      82    // Configure JWT Verification Middleware
+     ...
+       92      }
+       93    });
+       94  
+       95 +  // Configure Email Service (console-only mode for developmen
+          +t)                                                            
+       96 +  const baseUrl = "https://localhost:5173"; // Frontend URL fo
+          +r email links                                                 
+       97 +  const emailService = createEmailService(baseUrl);           
+       98 +                                                              
+       99 +  // Mount Registration Routes (public routes + admin routes w
+          +ith JWT verification)                                         
+      100 +  app.use("/", createRegistrationRouter({                     
+      101 +    db: authAdapter,                                          
+      102 +    verifyJWT: verifyJWT,                                     
+      103 +    config: {                                                 
+      104 +      verificationTokenLife: "24h",                           
+      105 +      passwordSetupTokenLife: "48h",                          
+      106 +      adminPermissionIds: [3], // Users with permission 3 can 
+          +manage registrations                                          
+      107 +      onRegistrationSubmit: (user, token) =>                  
+      108 +        emailService.sendVerificationEmail(user, token),      
+      109 +      onEmailVerified: (user) =>                              
+      110 +        emailService.sendAdminNotification(user, "admin@yourdo
+          +main.com"),                                                   
+      111 +      onApproval: (user, token) =>                            
+      112 +        emailService.sendApprovalEmail(user, token),          
+      113 +      onRejection: (user, reason) =>                          
+      114 +        emailService.sendRejectionEmail(user, reason),        
+      115 +    }                                                         
+      116 +  }));                                                        
+      117 +                                                              
+      118    // Test Routes to initialize db
+      119    app.use("/", require("./routes/deletedb.js"));
+      120    app.use("/", require("./routes/createdb.js"));
+
+● Read 2 files (ctrl+o to expand)
+
+● Now let me create the Login-FE wrapper components:
+
+● Write(Login-FE/src/components/RegistrationRequest.jsx)
+  ⎿  Wrote 39 lines to Login-FE/src/components/RegistrationRequest.jsx
+       1 import React from "react";
+       2 import {
+       3   RegistrationRequest as LibRegistrationRequest,
+       4   useRegistrationSubmit,
+       5 } from "@your-org/auth-fe";
+       6 import { Button, Stack, Box, Typography, Alert, CircularProgress
+          } from "@mui/material";
+       7 import TextField from "./HookFormMUI/TextField";
+       8 import { reqAxios } from "../api/axios";
+       9 
+      10 /**
+     … +29 lines (ctrl+o to expand)
+
+● Write(Login-FE/src/components/EmailVerification.jsx)
+  ⎿  Wrote 33 lines to Login-FE/src/components/EmailVerification.jsx
+       1 import React from "react";
+       2 import { useParams } from "react-router-dom";
+       3 import {
+       4   EmailVerification as LibEmailVerification,
+       5   useEmailVerification,
+       6 } from "@your-org/auth-fe";
+       7 import { Box, Typography, Alert, CircularProgress } from "@mui/m
+         aterial";
+       8 import { reqAxios } from "../api/axios";
+       9 
+      10 /**
+     … +23 lines (ctrl+o to expand)
+
+● Write(Login-FE/src/components/PasswordSetup.jsx)
+  ⎿  Wrote 54 lines to Login-FE/src/components/PasswordSetup.jsx
+      1 import React from "react";
+      2 import { useParams, useNavigate } from "react-router-dom";
+      3 import {
+      4   PasswordSetup as LibPasswordSetup,
+      5   usePasswordSetup,
+      6 } from "@your-org/auth-fe";
+      7 import { Button, Stack, Box, Typography, Alert, CircularProgress 
+        } from "@mui/material";
+      8 import TextField from "./HookFormMUI/TextField";
+      9 import { reqAxios } from "../api/axios";
+     … +44 lines (ctrl+o to expand)
+
+● Write(Login-FE/src/components/RegistrationSuccess.jsx)
+  ⎿  Wrote 19 lines to Login-FE/src/components/RegistrationSuccess.jsx
+       1 import React from "react";
+       2 import { RegistrationSuccess as LibRegistrationSuccess } from "@
+         your-org/auth-fe";
+       3 import { Box, Typography, Alert } from "@mui/material";
+       4 
+       5 /**
+       6  * App-specific wrapper for the registration success page.
+       7  */
+       8 function RegistrationSuccess() {
+       9   return (
+      10     <LibRegistrationSuccess
+     … +9 lines (ctrl+o to expand)
+
+● Write(Login-FE/src/components/AdminRegistrations.jsx)
+  ⎿  Wrote 188 lines to Login-FE/src/components/AdminRegistrations.jsx
+       1 import React, { useState } from "react";
+       2 import {
+       3   AdminRegistrationList,
+       4   AdminRegistrationDetail,
+       5   useAdminRegistrations,
+       6   useSecureAxios,
+       7 } from "@your-org/auth-fe";
+       8 import {
+       9   Box,
+      10   Typography,
+     … +178 lines (ctrl+o to expand)
+
+● Let me look at the current StandardAuthRoutes to understand how to properly
+  integrate the new routes:
+
+● Read 1 file (ctrl+o to expand)
+
+● I need to update StandardAuthRoutes to support additional public routes for
+  the registration workflow. Let me update both files:
+
+● Update(packages/auth-fe/src/components/StandardAuthRoutes.jsx)
+  ⎿  Added 10 lines, removed 1 line
+      12   * @param {React.Component} props.LayoutComponent - A layout co
+          mponent (like TopNavBar) to wrap the routes.
+      13   * @param {string} props.postLoginRedirect - Where to redirect 
+          after a successful login.
+      14   * @param {React.ReactNode} props.children - The protected appl
+          ication routes.
+      15 + * @param {React.ReactNode} props.publicRoutes - Additional pub
+         +lic routes accessible regardless of auth state.                
+      16   */
+      17  const StandardAuthRoutes = ({
+      18    LoginComponent,
+     ...
+      20    UnauthorizedComponent,
+      21    LayoutComponent: Layout = ({ children }) => <>{children}</>,
+      22    postLoginRedirect = "/",
+      22 -  children                                                     
+      23 +  children,                                                    
+      24 +  publicRoutes                                                 
+      25  }) => {
+      26    const { auth } = useAuth();
+      27    const isAuthenticated = !!auth.email;
+      28  
+      29    return (
+      30      <Routes>
+      31 +      {/* Public routes accessible regardless of authentication
+         + */}                                                           
+      32 +      {publicRoutes && (                                       
+      33 +        <Route element={<Layout />}>                           
+      34 +          {publicRoutes}                                       
+      35 +        </Route>                                               
+      36 +      )}                                                       
+      37 +                                                               
+      38        {!isAuthenticated ? (
+      39          <Route element={<Layout />}>
+      40            <Route path="/login" element={<LoginComponent success
+          Route={postLoginRedirect} />} />
+
+● Actually, let me take a simpler approach - I'll restructure AppRoutes.jsx to
+  handle the registration routes directly without relying on StandardAuthRoutes
+  for them:
+
+● Update(packages/auth-fe/src/components/StandardAuthRoutes.jsx)
+  ⎿  Added 6 lines, removed 6 lines
+      12   * @param {React.Component} props.LayoutComponent - A layout co
+          mponent (like TopNavBar) to wrap the routes.
+      13   * @param {string} props.postLoginRedirect - Where to redirect 
+          after a successful login.
+      14   * @param {React.ReactNode} props.children - The protected appl
+          ication routes.
+      15 - * @param {React.ReactNode} props.publicRoutes - Additional pub
+         -lic routes accessible regardless of auth state.                
+      15 + * @param {Array<{path: string, element: React.ReactNode}>} pro
+         +ps.publicRoutes - Additional public routes accessible regardles
+         +s of auth state.                                               
+      16   */
+      17  const StandardAuthRoutes = ({
+      18    LoginComponent,
+     ...
+      21    LayoutComponent: Layout = ({ children }) => <>{children}</>,
+      22    postLoginRedirect = "/",
+      23    children,
+      24 -  publicRoutes                                                 
+      24 +  publicRoutes = []                                            
+      25  }) => {
+      26    const { auth } = useAuth();
+      27    const isAuthenticated = !!auth.email;
+     ...
+      29    return (
+      30      <Routes>
+      31        {/* Public routes accessible regardless of authentication
+           */}
+      32 -      {publicRoutes && (                                       
+      33 -        <Route element={<Layout />}>                           
+      34 -          {publicRoutes}                                       
+      32 +      {publicRoutes.map(({ path, element }) => (               
+      33 +        <Route key={path} element={<Layout />}>                
+      34 +          <Route path={path} element={element} />              
+      35          </Route>
+      36 -      )}                                                       
+      36 +      ))}                                                      
+      37  
+      38        {!isAuthenticated ? (
+      39          <Route element={<Layout />}>
+
+● Now let me update AppRoutes.jsx:
+
+● Update(Login-FE/src/components/AppRoutes.jsx)
+  ⎿  Added 15 lines, removed 2 lines
+       3  import { StandardAuthRoutes, RequireAuth } from "@your-org/auth
+          -fe";
+       4  import TopNavBar from "./TopNavBar";
+       5  import Login from "./Login";
+       6 -import Register from "./Register";                             
+       6 +import RegistrationRequest from "./RegistrationRequest";       
+       7 +import EmailVerification from "./EmailVerification";           
+       8 +import PasswordSetup from "./PasswordSetup";                   
+       9 +import RegistrationSuccess from "./RegistrationSuccess";       
+      10  import Unauthorized from "./Unauthorized";
+      11 +import AdminRegistrations from "./AdminRegistrations";         
+      12  
+      13  import Users from "./Users";
+      14  import Roles from "./Roles";
+     ...
+      17  function AppRoutes() {
+      18    const loginSuccessRoute = "/loginadmin/users";
+      19  
+      20 +  // Public routes accessible without authentication (registrat
+         +ion workflow)                                                  
+      21 +  const publicRoutes = [                                       
+      22 +    { path: "/register/verify/:token", element: <EmailVerificat
+         +ion /> },                                                      
+      23 +    { path: "/register/setup/:token", element: <PasswordSetup /
+         +> },                                                           
+      24 +    { path: "/register/success", element: <RegistrationSuccess 
+         +/> },                                                          
+      25 +  ];                                                           
+      26 +                                                               
+      27    return (
+      28      <Router>
+      29        <StandardAuthRoutes
+      30          LoginComponent={(props) => (
+      31            <Login {...props} allowStay={true} successRoute={logi
+          nSuccessRoute} />
+      32          )}
+      22 -        RegisterComponent={Register}                           
+      33 +        RegisterComponent={RegistrationRequest}                
+      34          UnauthorizedComponent={Unauthorized}
+      35          LayoutComponent={TopNavBar}
+      36          postLoginRedirect={loginSuccessRoute}
+      37 +        publicRoutes={publicRoutes}                            
+      38        >
+      39          {/* Post-authorization routes defined by the applicatio
+          n */}
+      40          <Route element={<RequireAuth allowedPerms={[3]} />}>
+      41            <Route index element={<Users />} />
+      42            <Route path="loginadmin/users" element={<Users />} />
+      43 +          <Route path="loginadmin/registrations" element={<Admi
+         +nRegistrations />} />                                          
+      44          </Route>
+      45          <Route element={<RequireAuth allowedPerms={[4]} />}>
+      46            <Route path="loginadmin/roles" element={<Roles />} />
+
+● Update(Login-FE/src/constants/userSchema.js)
+  ⎿  Added 16 lines, removed 6 lines
+       3  export const validStatus = [
+       4    {
+       5      id: 1,
+       6 -    name: "Pending",                                           
+       7 -    value: "Pending",                                          
+       6 +    name: "Pending Verification",                              
+       7 +    value: "PENDING_VERIFICATION",                             
+       8    },
+       9    {
+      10      id: 2,
+      11 -    name: "Active",                                            
+      12 -    value: "Active",                                           
+      11 +    name: "Pending Approval",                                  
+      12 +    value: "PENDING_APPROVAL",                                 
+      13    },
+      14    {
+      15      id: 3,
+      16 -    name: "Inactive",                                          
+      17 -    value: "Inactive",                                         
+      16 +    name: "Approved",                                          
+      17 +    value: "APPROVED",                                         
+      18    },
+      19 +  {                                                            
+      20 +    id: 4,                                                     
+      21 +    name: "Active",                                            
+      22 +    value: "ACTIVE",                                           
+      23 +  },                                                           
+      24 +  {                                                            
+      25 +    id: 5,                                                     
+      26 +    name: "Rejected",                                          
+      27 +    value: "REJECTED",                                         
+      28 +  },                                                           
+      29  ];
+      30  
+      31  export const PWD_REGEX =
+
+● Let me install the new dependency in the auth-be package:
+
+● Bash(npm install)
+  ⎿  added 1 package, and audited 583 packages in 3s
+
+     165 packages are looking for funding
+     … +11 lines (ctrl+o to expand)
+  ⎿  (timeout 2m)
+
+● All tasks completed. Here's a summary of the registration workflow
+  implementation:
+
+  Implementation Summary
+
+  Database Schema (Login-BE/sql/registration/)
+
+  - alter_users.sql - Adds request_note and admin_rejection_note columns
+  - create_tokens.sql - Creates registration_tokens table
+  - migrate_status.sql - Migrates old status values (Pending→PENDING_APPROVAL,
+  Active→ACTIVE, Inactive→REJECTED)
+
+  auth-be Package
+
+  - PostgresAdapter.js - Added 11 new methods for registration workflow
+  - tokenGenerator.js - Token generation/hashing utility
+  - rateLimiter.js - Rate limiting middleware factory
+  - registrationFactory.js - Registration routes factory with:
+    - POST /register/submit - Phase 1: Submit registration (rate limited)
+    - GET /register/verify/:token - Phase 2: Verify email
+    - GET /register/setup/:token - Phase 4: Validate setup token
+    - POST /register/setup/:token - Phase 4: Set password
+    - GET /admin/pending-registrations - List pending (JWT protected)
+    - GET /admin/registration/:id - Get single registration
+    - POST /admin/registration/:id/approve - Approve registration
+    - POST /admin/registration/:id/reject - Reject registration
+
+  auth-fe Package
+
+  - Hooks: useRegistrationSubmit, useEmailVerification, usePasswordSetup,
+  useAdminRegistrations
+  - Components: RegistrationRequest, EmailVerification, PasswordSetup,
+  RegistrationSuccess, AdminRegistrationList, AdminRegistrationDetail
+  - StandardAuthRoutes.jsx - Updated to support publicRoutes prop
+
+  Login-BE Integration
+
+  - emailService.js - Console-only email service (logs to console)
+  - index.js - Mounts registration routes with email callbacks
+
+  Login-FE Integration
+
+  - Wrapper components for all registration UI
+  - AppRoutes.jsx - Updated with registration routes and admin registrations
+  page
+  - userSchema.js - Updated status values
+
+  Plan Documentation
+
+  - reg_plan.md - Full implementation plan saved for reference
+
+  To use this, you'll need to:
+  1. Run the SQL migrations on your database
+  2. Test the workflow by submitting a registration at /register
+  3. Check console logs for verification/approval email links
+
+✻ Worked for 4m 42s
+
+❯ /cost 
+  ⎿  Total cost:            $6.78
+     Total duration (API):  21m 15s
+     Total duration (wall): 1h 43m 30s
+     Total code changes:    3421 lines added, 159 lines removed
+     Usage by model:
+             claude-haiku:  48.1k input, 20.6k output, 1.3m cache read, 113.3k 
+     cache write ($0.4238)
+          claude-opus-4-5:  739 input, 73.8k output, 4.0m cache read, 403.3k 
+     cache write ($6.36)

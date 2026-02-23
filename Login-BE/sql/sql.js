@@ -48,7 +48,7 @@ module.exports = {
   },
   permissions: {
     tableName: "permissions",
-    fields: ["system", "perm_desc"],
+    fields: ["system", "perm_desc", "perm_key"],
     createTable: sql("permissions/create table.sql"),
     read: sql("permissions/perms read.sql"),
     userperms: sql("permissions/userperms.sql"),

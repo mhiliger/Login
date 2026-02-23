@@ -3,24 +3,15 @@ import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as Yup from "yup";
 import { useNavigate, NavLink } from "react-router-dom";
+import { TextField, Button, Box, Stack, Typography } from "@mui/material";
 import { useAuth } from "../context/AuthProvider";
 
 /**
  * Boilerplate Register component.
  * @param {Object} props
- * @param {React.Component} props.TextField - Text input component to use.
- * @param {React.Component} props.Button - Button component to use.
- * @param {React.Component} props.Box - Box/Container component.
- * @param {React.Component} props.Stack - Stack/Layout component.
- * @param {React.Component} props.Typography - Typography component.
  * @param {Function} props.onSubmit - Custom submit handler.
  */
 const Register = ({
-  TextField,
-  Button,
-  Box,
-  Stack,
-  Typography,
   onSubmit: externalOnSubmit,
   loginPath = "/login"
 }) => {
@@ -47,7 +38,7 @@ const Register = ({
     resolver: yupResolver(registrationSchema),
   });
 
-  const { handleSubmit, formState: { errors } } = form;
+  const { handleSubmit, register, formState: { errors } } = form;
 
   const onSubmit = (values) => {
     if (externalOnSubmit) {
@@ -65,31 +56,34 @@ const Register = ({
       <form onSubmit={handleSubmit(onSubmit)} noValidate>
         <Stack spacing={2}>
           <TextField
-            form={form}
-            name="email"
+            {...register("email")}
             label="Email"
             type="email"
             placeholder="Enter email"
             margin="normal"
             size="small"
+            error={!!errors.email}
+            helperText={errors.email?.message}
           />
           <TextField
-            form={form}
-            name="password"
+            {...register("password")}
             label="Password"
             type="password"
             placeholder="Enter password"
             margin="normal"
             size="small"
+            error={!!errors.password}
+            helperText={errors.password?.message}
           />
           <TextField
-            form={form}
-            name="confirmPwd"
+            {...register("confirmPwd")}
             label="Confirm Password"
             type="password"
             placeholder="Re-enter Password"
             margin="normal"
             size="small"
+            error={!!errors.confirmPwd}
+            helperText={errors.confirmPwd?.message}
           />
 
           <Button sx={{ margin: "10px" }} variant="outlined" type="submit">

@@ -30,6 +30,7 @@ const PermAED = ({ mode, perm, setPerm, setOpen, setModeResult }) => {
     defaultValues: {
       system: mode === "Add" ? "" : perm?.system,
       perm_desc: mode === "Add" ? "" : perm?.perm_desc,
+      perm_key: mode === "Add" ? "" : perm?.perm_key,
     },
     resolver: yupResolver(permSchema),
   });
@@ -52,6 +53,9 @@ const PermAED = ({ mode, perm, setPerm, setOpen, setModeResult }) => {
       if (dirtyFields.perm_desc) {
         obj.perm_desc = values.perm_desc;
       }
+      if (dirtyFields.perm_key) {
+        obj.perm_key = values.perm_key;
+      }
 
       try {
         const resp = await permEdit.mutateAsync({ id: perm?.id, perm: obj });
@@ -66,6 +70,7 @@ const PermAED = ({ mode, perm, setPerm, setOpen, setModeResult }) => {
     if (mode === "Add") {
       obj.system = values?.system;
       obj.perm_desc = values?.perm_desc;
+      obj.perm_key = values?.perm_key;
 
       console.log("permAdd", permAdd);
       try {
@@ -151,6 +156,16 @@ const PermAED = ({ mode, perm, setPerm, setOpen, setModeResult }) => {
                 label="System"
                 type="text"
                 placeholder="Enter system name"
+                margin="normal"
+                size="small"
+                disabled={mode === "Delete" ? true : false}
+              />
+              <TextField
+                form={form}
+                name="perm_key"
+                label="Permission Key"
+                type="text"
+                placeholder="Enter permission key"
                 margin="normal"
                 size="small"
                 disabled={mode === "Delete" ? true : false}

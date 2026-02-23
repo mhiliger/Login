@@ -1,9 +1,10 @@
 import React from "react";
+import { Typography, Stack } from "@mui/material";
 
 /**
  * Boilerplate Unauthorized component.
  */
-const Unauthorized = ({ Typography, Stack, Box }) => {
+const Unauthorized = () => {
   return (
     <Stack
       sx={{

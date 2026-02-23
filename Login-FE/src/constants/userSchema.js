@@ -3,18 +3,28 @@ import * as Yup from "yup";
 export const validStatus = [
   {
     id: 1,
-    name: "Pending",
-    value: "Pending",
+    name: "Pending Verification",
+    value: "PENDING_VERIFICATION",
   },
   {
     id: 2,
-    name: "Active",
-    value: "Active",
+    name: "Pending Approval",
+    value: "PENDING_APPROVAL",
   },
   {
     id: 3,
-    name: "Inactive",
-    value: "Inactive",
+    name: "Approved",
+    value: "APPROVED",
+  },
+  {
+    id: 4,
+    name: "Active",
+    value: "ACTIVE",
+  },
+  {
+    id: 5,
+    name: "Rejected",
+    value: "REJECTED",
   },
 ];
 

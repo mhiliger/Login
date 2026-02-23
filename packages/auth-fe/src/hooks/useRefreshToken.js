@@ -13,20 +13,18 @@ const useRefreshToken = (axiosInstance, refreshUrl = "refresh") => {
     return axiosInstance({ method: "GET", url: refreshUrl });
   };
 
-  const { refetch } = useQuery(
-    ["refresh"],
-    getRefreshToken,
-    {
-      onSuccess: (data) => {
-        setAuth((prev) => ({ ...prev, accessToken: data?.data?.accessToken }));
-      },
-      onError: (error) => {
-        console.log("Refresh Failed", error);
-      },
-      enabled: false,
-      retry: false,
-    }
-  );
+  const { refetch } = useQuery({
+    queryKey: ["refresh"],
+    queryFn: getRefreshToken,
+    onSuccess: (data) => {
+      setAuth((prev) => ({ ...prev, accessToken: data?.data?.accessToken }));
+    },
+    onError: (error) => {
+      console.log("Refresh Failed", error);
+    },
+    enabled: false,
+    retry: false,
+  });
 
   return refetch;
 };

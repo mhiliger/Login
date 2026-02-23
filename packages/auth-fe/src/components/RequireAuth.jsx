@@ -17,7 +17,7 @@ const RequireAuth = ({
   const { auth } = useAuth();
   const location = useLocation();
 
-  const hasPermission = auth?.permissions?.some((perm) => allowedPerms?.includes(perm));
+  const hasPermission = auth?.permissions?.some((perm) => allowedPerms?.includes(perm.perm_key));
 
   if (hasPermission) {
     return <Outlet />;

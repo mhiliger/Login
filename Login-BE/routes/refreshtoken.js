@@ -44,7 +44,7 @@ router.get("/refresh", async (req, res) => {
     let result = await dbRunSql(users.refresh, [userRecord.email]);
     if (result.length > 0) {
       result.map((perm) => {
-        perms.push(perm.id);
+        perms.push({ id: perm.id, system: perm.system, perm_key: perm.perm_key });
       });
     } else {
       return res
@@ -54,7 +54,7 @@ router.get("/refresh", async (req, res) => {
   } catch (error) {
     return res.status(403).json({ error: "Unable to read permissions for user" });
   }
-  let uniquePerms = [...new Set(perms)];
+  let uniquePerms = [...new Map(perms.map((item) => [item.id, item])).values()];
   // Create JWT Access Token
   let payload = {
     email: userRecord?.email,

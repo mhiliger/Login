@@ -20,10 +20,12 @@ import {
 import { useUserAddPost } from "../hooks/data/useUserAddPost";
 import { useUserEditPut } from "../hooks/data/useUserEditPut";
 import { useUserDelete } from "../hooks/data/useUserDelete";
+import { useUserResetPassword } from "../hooks/data/useUserResetPassword";
 // Component
 const UserAED = ({ ref, mode, user, setUser, setOpen, setModeResult }) => {
   console.log("In UserAED");
   const [formError, setFormError] = useState("");
+  const [formSuccess, setFormSuccess] = useState("");
 
   const handleCancel = (values) => {
     setOpen(false);
@@ -54,6 +56,18 @@ const UserAED = ({ ref, mode, user, setUser, setOpen, setModeResult }) => {
   const userAdd = useUserAddPost();
   const userDelete = useUserDelete();
   const userEdit = useUserEditPut();
+  const userResetPassword = useUserResetPassword();
+
+  const handleResetPassword = async () => {
+    setFormError("");
+    setFormSuccess("");
+    try {
+      await userResetPassword.mutateAsync(user.id);
+      setFormSuccess("Password reset email sent successfully.");
+    } catch (error) {
+       setFormError(error?.response?.data?.error || error.message);
+    }
+  };
 
   const onSubmit = async (values) => {
     setFormError("");
@@ -150,6 +164,7 @@ const UserAED = ({ ref, mode, user, setUser, setOpen, setModeResult }) => {
           )}
         </Typography>
         <Typography color="error">{formError}</Typography>
+        <Typography color="success.main">{formSuccess}</Typography>
         <form onSubmit={handleSubmit(onSubmit)} noValidate>
           <Box sx={{ margin: "auto", overflow: "auto", height: "50vh" }}>
             <Stack sx={{ width: "60%", margin: "auto", overflow: "auto" }}>
@@ -195,7 +210,7 @@ const UserAED = ({ ref, mode, user, setUser, setOpen, setModeResult }) => {
                 size="small"
                 disabled={mode === "Delete" ? true : false}
               />
-              {mode !== "Delete" && (
+              {mode === "Add" && (
                 <>
                   <TextField
                     form={form}
@@ -216,6 +231,11 @@ const UserAED = ({ ref, mode, user, setUser, setOpen, setModeResult }) => {
                     size="small"
                   />
                 </>
+              )}
+              {mode === "Edit" && (
+                  <Button variant="contained" color="secondary" onClick={handleResetPassword} sx={{ mt: 2, mb: 2 }}>
+                    Reset Password
+                  </Button>
               )}
               <>
                 <Typography>

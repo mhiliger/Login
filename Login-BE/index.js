@@ -7,6 +7,12 @@ const https = require("https");
 const cookieParser = require("cookie-parser");
 require("dotenv").config();
 
+// Register Babel to handle JSX imports
+require("@babel/register")({
+  extensions: [".js", ".jsx"],
+  presets: ["@babel/preset-env", "@babel/preset-react"],
+});
+
 const { getSecret } = require("./utilities/getSecret");
 const PORT = process.env.REST_PORT || 8080;
 var sslKEY;
@@ -17,24 +23,24 @@ async function initializeApp() {
     console.log("🔗 Connecting to Google Secret Manager...");
 
     // 1. Load secrets FIRST
-    const [dbPass, accessToken, refreshToken, sslKey, sslCert, sslChain] = await Promise.all([
+    const [dbPass, accessToken, refreshToken, sslKey, sslCert, sslChain, resendApiKey] = await Promise.all([
       getSecret("login-db-password"),
       getSecret("login-access-token"),
       getSecret("login-refresh-token"),
       getSecret("SSL-KEY-PATH"),
       getSecret("SSL-CERT-PATH"),
-      getSecret("SSL-CHAIN-PATH")
+      getSecret("SSL-CHAIN-PATH"),
+      getSecret("RESEND_API_KEY"),
     ]);
-    sslKEY = sslKey
-    sslCERT = sslCert
-    sslCHAIN = sslChain
-    console.log("sslKEY:", sslKEY);
-    console.log("sslCERT:", sslCERT);
-    console.log("sslCHAIN:", sslCHAIN);
+    sslKEY = sslKey;
+    sslCERT = sslCert;
+    sslCHAIN = sslChain;
+
 
     process.env.DB_PASSWORD = dbPass;
     process.env.ACCESS_TOKEN_SECRET = accessToken;
     process.env.REFRESH_TOKEN_SECRET = refreshToken;
+    process.env.RESEND_API_KEY = resendApiKey;
 
     console.log("✅ Secrets loaded into environment.");
 
@@ -50,9 +56,10 @@ async function initializeApp() {
 
 function startServer() {
   const app = express();
-  const { createAuthRouter, createVerifyJWT, createPostgresAdapter } = require("@your-org/auth-be");
+  const { createAuthRouter, createRegistrationRouter, createVerifyJWT, createPostgresAdapter } = require("@your-org/auth-be");
   const db = require("./db/index.js");
   const authAdapter = createPostgresAdapter(db);
+  const { createEmailService } = require("./services/emailService");
 
   app.use(cors({
     origin: ["https://rest.hiliger.com:3000", "https://localhost:5173", "https://localhost:5174", "https://127.0.0.1:5173"],
@@ -73,9 +80,9 @@ function startServer() {
   };
 
   // Mount Auth Routes (login, refresh, logout)
-  app.use("/", createAuthRouter({ 
-    db: authAdapter, 
-    config: authConfig 
+  app.use("/", createAuthRouter({
+    db: authAdapter,
+    config: authConfig
   }));
 
   // Configure JWT Verification Middleware
@@ -90,6 +97,38 @@ function startServer() {
       req.userId = decoded.userId;
     }
   });
+
+  // Configure Email Service (console-only mode for development)
+  const baseUrl = "https://localhost:5173"; // Frontend URL for email links
+  const emailService = createEmailService(baseUrl);
+
+  // Mount Local Admin Registration Routes
+  const createAdminRegistrationRouter = require("./routes/adminRegistrations.js");
+  app.use("/", createAdminRegistrationRouter({
+    db: authAdapter,
+    verifyJWT: verifyJWT,
+    emailService: emailService
+  }));
+
+  // Mount Registration Routes (public routes + admin routes with JWT verification)
+  app.use("/", createRegistrationRouter({
+    db: authAdapter,
+    verifyJWT: verifyJWT,
+    config: {
+      verificationTokenLife: "24h",
+      passwordSetupTokenLife: "48h",
+      onRegistrationSubmit: (user, token) =>
+        emailService.sendVerificationEmail(user, token),
+      onEmailVerified: (user) =>
+        emailService.sendAdminNotification(user, "admin@yourdomain.com"),
+      onApproval: (user, token) =>
+        emailService.sendApprovalEmail(user, token),
+      onRejection: (user, reason) =>
+        emailService.sendRejectionEmail(user, reason),
+      onPasswordReset: (user, token) =>
+        emailService.sendPasswordResetEmail(user, token),
+    }
+  }));
 
   // Test Routes to initialize db
   app.use("/", require("./routes/deletedb.js"));

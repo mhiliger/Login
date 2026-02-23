@@ -2,23 +2,18 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, NavLink } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import jwt_decode from "jwt-decode";
+import { TextField, Button, Box, Stack, Typography, Alert } from "@mui/material";
 import { useAuth } from "../context/AuthProvider";
 
 /**
  * Boilerplate Login component.
  */
 const Login = ({
-  TextField,
-  Checkbox,
-  Button,
-  Box,
-  Stack,
-  Typography,
-  Alert,
   loginMutation, // result of useLogin hook
   successRoute = "/",
   registerPath = "/register",
-  allowStay = true,
+  resetPath = "/forgot-password",
+  allowStay = false,
   onLoginSuccess
 }) => {
   const [formError, setFormError] = useState("");
@@ -33,7 +28,7 @@ const Login = ({
     }
   });
 
-  const { handleSubmit, formState: { errors } } = form;
+  const { handleSubmit, register, formState: { errors } } = form;
 
   const onSubmit = (values) => {
     setFormError("");
@@ -47,7 +42,7 @@ const Login = ({
         const token = loginMutation.data?.data?.accessToken;
         const payload = jwt_decode(token);
         
-        if (payload.status !== "Active") {
+        if (payload.status !== "ACTIVE") {
           setFormError("Successful login... but user is not Active. See system administrator");
           return;
         }
@@ -91,30 +86,40 @@ const Login = ({
       <form onSubmit={handleSubmit(onSubmit)} noValidate>
         <Stack spacing={2}>
           <TextField
-            form={form}
-            name="email"
+            {...register("email")}
             label="Email"
             type="email"
             placeholder="Enter email"
             margin="normal"
             size="small"
+            error={!!errors.email}
+            helperText={errors.email?.message}
           />
           <TextField
-            form={form}
-            name="password"
+            {...register("password")}
             label="Password"
             type="password"
             placeholder="Enter password"
             margin="normal"
             size="small"
+            error={!!errors.password}
+            helperText={errors.password?.message}
           />
-          {allowStay && (
-            <Checkbox
-              form={form}
-              name="stayLoggedIn"
+          <Box sx={{ mt: 2 }}>
+        <NavLink style={{ textDecoration: "underline" }} to={resetPath}>
+          Reset Password
+        </NavLink>
+      </Box>
+          {/* {false && (
+            <FormControlLabel
+              control={
+                <Checkbox
+                  {...register("stayLoggedIn")}
+                />
+              }
               label="Stay Logged In"
             />
-          )}
+          )} */}
           <Button sx={{ margin: "10px" }} variant="outlined" type="submit">
             Submit
           </Button>

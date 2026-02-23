@@ -71,6 +71,11 @@ function Perms() {
         size: 100,
       },
       {
+        accessorKey: "perm_key",
+        header: "Permission Key",
+        size: 150,
+      },
+      {
         accessorKey: "perm_desc", //access nested data with dot notation
         header: "Permission Description",
       },

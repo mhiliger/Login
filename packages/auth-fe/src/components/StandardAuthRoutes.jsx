@@ -12,6 +12,7 @@ import RequireAuth from "./RequireAuth";
  * @param {React.Component} props.LayoutComponent - A layout component (like TopNavBar) to wrap the routes.
  * @param {string} props.postLoginRedirect - Where to redirect after a successful login.
  * @param {React.ReactNode} props.children - The protected application routes.
+ * @param {Array<{path: string, element: React.ReactNode}>} props.publicRoutes - Additional public routes accessible regardless of auth state.
  */
 const StandardAuthRoutes = ({
   LoginComponent,
@@ -19,13 +20,21 @@ const StandardAuthRoutes = ({
   UnauthorizedComponent,
   LayoutComponent: Layout = ({ children }) => <>{children}</>,
   postLoginRedirect = "/",
-  children
+  children,
+  publicRoutes = []
 }) => {
   const { auth } = useAuth();
   const isAuthenticated = !!auth.email;
 
   return (
     <Routes>
+      {/* Public routes accessible regardless of authentication */}
+      {publicRoutes.map(({ path, element }) => (
+        <Route key={path} element={<Layout />}>
+          <Route path={path} element={element} />
+        </Route>
+      ))}
+
       {!isAuthenticated ? (
         <Route element={<Layout />}>
           <Route path="/login" element={<LoginComponent successRoute={postLoginRedirect} />} />
