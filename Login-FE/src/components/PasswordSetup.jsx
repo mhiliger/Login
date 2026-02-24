@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import {
   PasswordSetup as LibPasswordSetup,
   usePasswordSetup,
-} from "@your-org/auth-fe";
+} from "@mhiliger/auth-fe";
 import { reqAxios } from "../api/axios";
 
 /**

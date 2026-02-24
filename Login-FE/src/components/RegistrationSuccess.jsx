@@ -1,5 +1,5 @@
 import React from "react";
-import { RegistrationSuccess as LibRegistrationSuccess } from "@your-org/auth-fe";
+import { RegistrationSuccess as LibRegistrationSuccess } from "@mhiliger/auth-fe";
 
 /**
  * App-specific wrapper for the registration success page.

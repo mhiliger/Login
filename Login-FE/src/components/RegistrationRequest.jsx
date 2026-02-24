@@ -2,7 +2,7 @@ import React from "react";
 import {
   RegistrationRequest as LibRegistrationRequest,
   useRegistrationSubmit,
-} from "@your-org/auth-fe";
+} from "@mhiliger/auth-fe";
 import { reqAxios } from "../api/axios";
 
 /**

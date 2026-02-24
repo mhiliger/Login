@@ -1,4 +1,4 @@
-import { useAuth as useLibAuth } from "@your-org/auth-fe";
+import { useAuth as useLibAuth } from "@mhiliger/auth-fe";
 
 /**
  * App-specific wrapper for useAuth hook.

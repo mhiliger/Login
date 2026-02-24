@@ -1,6 +1,6 @@
 import React from "react";
 import { BrowserRouter as Router, Route } from "react-router-dom";
-import { StandardAuthRoutes, RequireAuth } from "@your-org/auth-fe";
+import { StandardAuthRoutes, RequireAuth } from "@mhiliger/auth-fe";
 import TopNavBar from "./TopNavBar";
 import Login from "./Login";
 import RegistrationRequest from "./RegistrationRequest";

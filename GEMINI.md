@@ -64,13 +64,13 @@ The frontend is a React single-page application that uses React Router v6 for ro
 
 The authentication logic has been encapsulated into reusable packages in the `packages/` directory, managed via NPM Workspaces.
 
-#### Backend Library (`@your-org/auth-be`)
+#### Backend Library (@mhiliger/auth-be)
 - **Location**: `packages/auth-be`
 - **Purpose**: Provides factories for Express auth routes, registration routes, and JWT verification middleware.
 - **Integration**: Uses `Login-BE/db/index.js` to map library requirements to the project's PostgreSQL database.
 - **Key Exports**: `createAuthRouter`, `createRegistrationRouter`, `createVerifyJWT`, and `createRegistrationLimiter`.
 
-#### Frontend Library (`@your-org/auth-fe`)
+#### Frontend Library (@mhiliger/auth-fe)
 - **Location**: `packages/auth-fe`
 - **Purpose**: Manages React auth state, registration UI, secure API communication, and route guarding.
 - **Key Exports**: `AuthProvider`, `useAuth`, `useSecureAxios`, `RequireAuth`, `RegistrationRequest`, `EmailVerification`, `PasswordSetup`, `RegistrationSuccess`, `AdminRegistrationList`, and `AdminRegistrationDetail`.

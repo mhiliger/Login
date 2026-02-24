@@ -1,4 +1,4 @@
-import { RequireAuth as LibRequireAuth } from "@your-org/auth-fe";
+import { RequireAuth as LibRequireAuth } from "@mhiliger/auth-fe";
 
 /**
  * App-specific wrapper for RequireAuth.

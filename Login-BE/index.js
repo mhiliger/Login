@@ -56,7 +56,7 @@ async function initializeApp() {
 
 function startServer() {
   const app = express();
-  const { createAuthRouter, createRegistrationRouter, createVerifyJWT, createPostgresAdapter } = require("@your-org/auth-be");
+  const { createAuthRouter, createRegistrationRouter, createVerifyJWT, createPostgresAdapter } = require("@mhiliger/auth-be");
   const db = require("./db/index.js");
   const authAdapter = createPostgresAdapter(db);
   const { createEmailService } = require("./services/emailService");
@@ -108,6 +108,13 @@ function startServer() {
     db: authAdapter,
     verifyJWT: verifyJWT,
     emailService: emailService
+  }));
+
+  // Mount Internal Auth Router (for other applications to use this as an identity service)
+  const { createInternalRouter } = require("@mhiliger/auth-be");
+  app.use("/internal", createInternalRouter({
+    db: authAdapter,
+    apiKey: process.env.INTERNAL_API_KEY || "change-me-in-production"
   }));
 
   // Mount Registration Routes (public routes + admin routes with JWT verification)

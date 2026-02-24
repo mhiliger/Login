@@ -1,5 +1,5 @@
 import React from "react";
-import { PasswordResetRequest as LibPasswordResetRequest, useRequestPasswordReset } from "@your-org/auth-fe";
+import { PasswordResetRequest as LibPasswordResetRequest, useRequestPasswordReset } from "@mhiliger/auth-fe";
 import { reqSecureAxios } from "../api/axios";
 
 /**

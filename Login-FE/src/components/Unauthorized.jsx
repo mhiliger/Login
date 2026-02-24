@@ -1,5 +1,5 @@
 import React from "react";
-import { Unauthorized as LibUnauthorized } from "@your-org/auth-fe";
+import { Unauthorized as LibUnauthorized } from "@mhiliger/auth-fe";
 
 /**
  * App-specific wrapper for the library's boilerplate Unauthorized component.

@@ -1,4 +1,4 @@
-# @your-org/auth-be
+# @mhiliger/auth-be
 
 Shared authentication backend for Express.js applications. This package provides:
 - Secure JWT (JSON Web Token) issuance and verification.
@@ -9,7 +9,7 @@ Shared authentication backend for Express.js applications. This package provides
 ## Installation
 
 ```bash
-npm install @your-org/auth-be express jsonwebtoken express-rate-limit pg-promise
+npm install @mhiliger/auth-be express jsonwebtoken express-rate-limit pg-promise
 ```
 
 ## Setup
@@ -36,7 +36,7 @@ const db = pgp({
   password: process.env.DB_PASSWORD
 });
 
-const { createPostgresAdapter } = require("@your-org/auth-be");
+const { createPostgresAdapter } = require("@mhiliger/auth-be");
 const authAdapter = createPostgresAdapter(db);
 
 module.exports = authAdapter;
@@ -63,7 +63,7 @@ Mount the auth and registration routers.
 ```javascript
 const express = require("express");
 const cookieParser = require("cookie-parser");
-const { createAuthRouter, createRegistrationRouter, createVerifyJWT } = require("@your-org/auth-be");
+const { createAuthRouter, createRegistrationRouter, createVerifyJWT } = require("@mhiliger/auth-be");
 const authAdapter = require("./db"); // Your adapter
 const emailService = require("./services/email"); // Your service
 

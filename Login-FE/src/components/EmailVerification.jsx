@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import {
   EmailVerification as LibEmailVerification,
   useEmailVerification,
-} from "@your-org/auth-fe";
+} from "@mhiliger/auth-fe";
 import { reqAxios } from "../api/axios";
 
 /**

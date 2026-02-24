@@ -1,5 +1,5 @@
 import React from "react";
-import { Register as LibRegister } from "@your-org/auth-fe";
+import { Register as LibRegister } from "@mhiliger/auth-fe";
 
 /**
  * App-specific wrapper for the library's boilerplate Register component.

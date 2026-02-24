@@ -1,5 +1,5 @@
 import { reqSecureAxios } from "../../api/axios";
-import { useSecureAxios as useLibSecureAxios } from "@your-org/auth-fe";
+import { useSecureAxios as useLibSecureAxios } from "@mhiliger/auth-fe";
 
 /**
  * App-specific wrapper for the library's useSecureAxios hook.

@@ -3,14 +3,15 @@ import { useAuth } from "../context/AuthProvider";
 
 /**
  * Hook to handle token refresh logic.
- * @param {Object} axiosInstance - The axios instance to use for the refresh request.
+ * @param {Object} [axiosInstance] - The axios instance to use. If not provided, uses authAxios from AuthProvider.
  * @param {string} refreshUrl - The endpoint for refreshing the token (e.g., "/refresh").
  */
 const useRefreshToken = (axiosInstance, refreshUrl = "refresh") => {
-  const { setAuth } = useAuth();
+  const { setAuth, authAxios } = useAuth();
+  const instance = axiosInstance || authAxios;
 
   const getRefreshToken = () => {
-    return axiosInstance({ method: "GET", url: refreshUrl });
+    return instance({ method: "GET", url: refreshUrl });
   };
 
   const { refetch } = useQuery({

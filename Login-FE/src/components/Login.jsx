@@ -1,5 +1,5 @@
 import React from "react";
-import { Login as LibLogin, useLogin } from "@your-org/auth-fe";
+import { Login as LibLogin, useLogin } from "@mhiliger/auth-fe";
 import { reqSecureAxios } from "../api/axios";
 
 /**

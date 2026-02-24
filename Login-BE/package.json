@@ -16,7 +16,7 @@
     "@google-cloud/secret-manager": "^6.1.1",
     "@react-email/components": "^1.0.7",
     "@react-email/render": "^2.0.4",
-    "@your-org/auth-be": "file:../packages/auth-be",
+    "@mhiliger/auth-be": "file:../packages/auth-be",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "debug": "^4.3.7",

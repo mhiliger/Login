@@ -1,4 +1,4 @@
-import { AuthProvider as LibAuthProvider } from "@your-org/auth-fe";
+import { AuthProvider as LibAuthProvider } from "@mhiliger/auth-fe";
 
 /**
  * App-specific wrapper for AuthProvider.

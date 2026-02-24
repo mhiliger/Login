@@ -1,11 +1,11 @@
-# @your-org/auth-fe
+# @mhiliger/auth-fe
 
 Shared authentication and registration library for React applications. This package provides components and hooks to implement a complete user registration and login workflow, including email verification, password setup, and role-based access control.
 
 ## Installation
 
 ```bash
-npm install @your-org/auth-fe @tanstack/react-query axios jwt-decode react-hook-form @hookform/resolvers yup @mui/material @emotion/react @emotion/styled
+npm install @mhiliger/auth-fe @tanstack/react-query axios jwt-decode react-hook-form @hookform/resolvers yup @mui/material @emotion/react @emotion/styled
 ```
 
 Ensure you also have `react` and `react-router-dom` installed.
@@ -20,7 +20,7 @@ In your root component (e.g., `main.jsx` or `App.jsx`), wrap your application wi
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { AuthProvider } from "@your-org/auth-fe";
+import { AuthProvider } from "@mhiliger/auth-fe";
 import App from "./App";
 
 const queryClient = new QueryClient();
@@ -43,7 +43,7 @@ Create an `axios` instance and use the `useSecureAxios` hook to automatically at
 ```jsx
 // src/api/axios.js
 import axios from "axios";
-import { useSecureAxios } from "@your-org/auth-fe";
+import { useSecureAxios } from "@mhiliger/auth-fe";
 
 const BASE_URL = "https://api.yourdomain.com";
 
@@ -67,7 +67,7 @@ The library components often require you to pass your specific API hooks or conf
 
 ```jsx
 import React from "react";
-import { Login as LibLogin, useLogin } from "@your-org/auth-fe";
+import { Login as LibLogin, useLogin } from "@mhiliger/auth-fe";
 import { axiosPrivate } from "../api/axios"; // Your axios instance
 
 const Login = (props) => {
@@ -92,7 +92,7 @@ export default Login;
 
 ```jsx
 import React from "react";
-import { RegistrationRequest as LibRegister, useRegistrationSubmit } from "@your-org/auth-fe";
+import { RegistrationRequest as LibRegister, useRegistrationSubmit } from "@mhiliger/auth-fe";
 import { axiosPrivate } from "../api/axios";
 
 const RegistrationRequest = () => {
@@ -116,7 +116,7 @@ Use `StandardAuthRoutes` to set up your routing structure with protection.
 ```jsx
 import React from "react";
 import { BrowserRouter, Route } from "react-router-dom";
-import { StandardAuthRoutes, RequireAuth } from "@your-org/auth-fe";
+import { StandardAuthRoutes, RequireAuth } from "@mhiliger/auth-fe";
 import Login from "./Login"; // Your wrapper
 import RegistrationRequest from "./RegistrationRequest"; // Your wrapper
 import Unauthorized from "./Unauthorized"; // Your wrapper or lib component
