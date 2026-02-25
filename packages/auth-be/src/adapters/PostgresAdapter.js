@@ -2,7 +2,7 @@
  * A standard Postgres adapter for the authentication library.
  * Assumes a schema with 'users', 'roles', 'permissions', 'UserRoles', and 'RolePerms' tables.
  *
- * @param {Object} db - A database connection object (e.g., pg-promise instance).
+ * @param {Object} db - A database connection object providing methods like one, manyOrNone, and none.
  * @returns {Object} An auth adapter implementation.
  */
 const createPostgresAdapter = (db) => ({

@@ -14,7 +14,7 @@ Ensure you also have `react` and `react-router-dom` installed.
 
 ### 1. Wrap your application in `AuthProvider`
 
-In your root component (e.g., `main.jsx` or `App.jsx`), wrap your application with `AuthProvider` and `QueryClientProvider`.
+In your root component (e.g., `main.jsx` or `App.jsx`), wrap your application with `AuthProvider` and `QueryClientProvider`. You must provide the `authBaseUrl` which points to your authentication backend.
 
 ```jsx
 import React from "react";
@@ -28,7 +28,7 @@ const queryClient = new QueryClient();
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
+      <AuthProvider authBaseUrl="https://api.yourdomain.com">
         <App />
       </AuthProvider>
     </QueryClientProvider>

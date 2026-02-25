@@ -1,2 +1,1 @@
-add to npm so app can load from there
 Fold back into master on github

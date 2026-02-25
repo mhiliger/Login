@@ -1,6 +1,6 @@
 {
   "name": "@mhiliger/auth-fe",
-  "version": "1.0.1",
+  "version": "1.0.4",
   "description": "Shared authentication and JWT management for React",
   "main": "dist/auth-fe.umd.js",
   "module": "dist/auth-fe.es.js",
