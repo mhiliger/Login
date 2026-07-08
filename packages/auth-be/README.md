@@ -20,13 +20,20 @@ The library uses an adapter pattern to interact with identity data. For most app
 
 **Using the HttpAdapter (Recommended):**
 
-This allows your application to authenticate users without connecting directly to the database.
+This allows your application to authenticate users without connecting directly to the database. **Note:** The central identity service requires an API key for internal access. You must configure your HTTP client to include the `x-api-key` header.
 
 ```javascript
 const axios = require("axios");
 const { createHttpAdapter } = require("@mhiliger/auth-be");
 
-const authAdapter = createHttpAdapter(axios, process.env.IDENTITY_SERVICE_URL);
+// Create a client with the internal API key
+const identityClient = axios.create({
+  headers: {
+    "x-api-key": process.env.LOGIN_SERVICE_API_KEY
+  }
+});
+
+const authAdapter = createHttpAdapter(identityClient, process.env.IDENTITY_SERVICE_URL);
 
 module.exports = authAdapter;
 ```
@@ -130,3 +137,13 @@ Creates registration and password management endpoints.
 - `GET /admin/list` (Admin: List pending requests)
 - `POST /admin/approve/:id` (Admin: Approve request)
 - `POST /admin/reject/:id` (Admin: Reject request)
+
+### `createInternalRouter({ db, apiKey })`
+Creates an Express router that exposes auth adapter methods as HTTP endpoints. This is used by the master identity service to provide identity data to other applications.
+- **apiKey**: A required string used to protect these endpoints. Consumer applications must provide this key in the `x-api-key` header.
+- `POST /auth/validate`
+- `GET /auth/permissions/:email`
+- `POST /auth/refresh-token`
+- `POST /auth/find-by-refresh`
+- `POST /auth/clear-refresh`
+- (And various registration/token management endpoints)

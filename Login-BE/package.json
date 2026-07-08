@@ -14,9 +14,9 @@
     "@babel/preset-react": "^7.28.5",
     "@babel/register": "^7.28.6",
     "@google-cloud/secret-manager": "^6.1.1",
+    "@mhiliger/auth-be": "file:../packages/auth-be",
     "@react-email/components": "^1.0.7",
     "@react-email/render": "^2.0.4",
-    "@mhiliger/auth-be": "file:../packages/auth-be",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "debug": "^4.3.7",
@@ -30,6 +30,6 @@
     "resend": "^6.9.1"
   },
   "devDependencies": {
-    "nodemon": "^2.0.15"
+    "nodemon": "^2.0.22"
   }
 }

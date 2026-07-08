@@ -23,7 +23,7 @@ async function initializeApp() {
     console.log("🔗 Connecting to Google Secret Manager...");
 
     // 1. Load secrets FIRST
-    const [dbPass, accessToken, refreshToken, sslKey, sslCert, sslChain, resendApiKey] = await Promise.all([
+    const [dbPass, accessToken, refreshToken, sslKey, sslCert, sslChain, resendApiKey, internalApiKey] = await Promise.all([
       getSecret("login-db-password"),
       getSecret("login-access-token"),
       getSecret("login-refresh-token"),
@@ -31,6 +31,7 @@ async function initializeApp() {
       getSecret("SSL-CERT-PATH"),
       getSecret("SSL-CHAIN-PATH"),
       getSecret("RESEND_API_KEY"),
+      getSecret("login-internal-key"),
     ]);
     sslKEY = sslKey;
     sslCERT = sslCert;
@@ -41,6 +42,7 @@ async function initializeApp() {
     process.env.ACCESS_TOKEN_SECRET = accessToken;
     process.env.REFRESH_TOKEN_SECRET = refreshToken;
     process.env.RESEND_API_KEY = resendApiKey;
+    process.env.INTERNAL_API_KEY = internalApiKey;
 
     console.log("✅ Secrets loaded into environment.");
 

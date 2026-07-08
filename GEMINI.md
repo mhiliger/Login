@@ -120,6 +120,7 @@ The application has a three-tier access control system: Users -> Roles -> Permis
 
 -   `DB_HOST`, `DB_PORT`, `DB_USER`: Database connection details. The password is loaded from Secret Manager.
 -   `REST_PORT`: The port for the backend server (defaults to 8080).
+-   `INTERNAL_API_KEY`: API key for protecting internal auth endpoints (loaded from Secret Manager as `login-internal-key`).
 
 ### Frontend (`.env` in `Login-FE`)
 

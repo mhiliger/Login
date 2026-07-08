@@ -15,6 +15,12 @@ export { default as PasswordSetup } from "./components/PasswordSetup";
 export { default as RegistrationSuccess } from "./components/RegistrationSuccess";
 export { default as PasswordResetRequest } from "./components/PasswordResetRequest";
 
+// Smart workflow components
+export { default as SmartRegistrationRequest } from "./components/SmartRegistrationRequest";
+export { default as SmartEmailVerification } from "./components/SmartEmailVerification";
+export { default as SmartPasswordSetup } from "./components/SmartPasswordSetup";
+export { default as SmartPasswordResetRequest } from "./components/SmartPasswordResetRequest";
+
 // Registration workflow hooks
 export { default as useRegistrationSubmit } from "./hooks/useRegistrationSubmit";
 export { default as useEmailVerification } from "./hooks/useEmailVerification";

@@ -2,12 +2,16 @@ import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthProvider";
 import RequireAuth from "./RequireAuth";
+import SmartRegistrationRequest from "./SmartRegistrationRequest";
+import SmartEmailVerification from "./SmartEmailVerification";
+import SmartPasswordSetup from "./SmartPasswordSetup";
+import SmartPasswordResetRequest from "./SmartPasswordResetRequest";
 
 /**
  * A standard routing component that handles pre and post authorization flow.
  * @param {Object} props
  * @param {React.Component} props.LoginComponent - The component to render for the login page.
- * @param {React.Component} props.RegisterComponent - The component to render for the registration page.
+ * @param {React.Component} [props.RegisterComponent] - Optional override for the registration component.
  * @param {React.Component} props.UnauthorizedComponent - The component to render for unauthorized access.
  * @param {React.Component} props.LayoutComponent - A layout component (like TopNavBar) to wrap the routes.
  * @param {string} props.postLoginRedirect - Where to redirect after a successful login.
@@ -26,6 +30,8 @@ const StandardAuthRoutes = ({
   const { auth } = useAuth();
   const isAuthenticated = !!auth.email;
 
+  const ActiveRegisterComponent = RegisterComponent || SmartRegistrationRequest;
+
   return (
     <Routes>
       {/* Public routes accessible regardless of authentication */}
@@ -38,7 +44,10 @@ const StandardAuthRoutes = ({
       {!isAuthenticated ? (
         <Route element={<Layout />}>
           <Route path="/login" element={<LoginComponent successRoute={postLoginRedirect} />} />
-          <Route path="/register" element={<RegisterComponent />} />
+          <Route path="/register" element={<ActiveRegisterComponent />} />
+          <Route path="/register/verify/:token" element={<SmartEmailVerification />} />
+          <Route path="/register/setup/:token" element={<SmartPasswordSetup />} />
+          <Route path="/forgot-password" element={<SmartPasswordResetRequest />} />
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Route>
       ) : (
